@@ -1,7 +1,11 @@
+use super::{
+    command::RenderCommandDevice, resources::RenderResourceDevice, shader::RenderShaderDevice,
+};
+
 pub type RenderDeviceId = usize;
 
 pub trait Api {
-    type Device;
+    type Device: RenderResourceDevice + RenderCommandDevice + RenderShaderDevice;
 
     fn enumerate_devices(&self) -> impl Iterator<Item = &RenderDeviceInfo> + '_;
     fn create_device(&self, index: RenderDeviceId) -> Self::Device;
