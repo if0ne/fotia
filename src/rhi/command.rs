@@ -26,4 +26,9 @@ pub enum CommandType {
     Transfer,
 }
 
-pub trait GpuEvent {}
+pub trait GpuEvent {
+    fn wait(&self, value: SyncPoint) -> bool;
+    fn increment(&self) -> SyncPoint;
+    fn get_completed_value(&self) -> SyncPoint;
+    fn get_goal(&self) -> SyncPoint;
+}
