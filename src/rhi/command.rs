@@ -1,10 +1,12 @@
 pub type SyncPoint = u64;
 
 pub trait RenderCommandDevice {
+    type ResourceUploader: RenderResourceUploader;
     type CommandQueue: RenderCommandQueue;
     type Event;
 
     fn create_command_queue(&self, ty: CommandType, capacity: Option<usize>) -> Self::CommandQueue;
+    fn create_resource_uploader(&self) -> Self::ResourceUploader;
 
     fn create_event(&self, shared: bool) -> Self::Event;
     fn open_event(&self, event: &Self::Event, other_gpu: &Self) -> Self::Event;

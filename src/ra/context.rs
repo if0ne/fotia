@@ -12,6 +12,8 @@ pub struct Context<D: RenderResourceDevice + RenderCommandDevice> {
     pub(super) compute_queue: D::CommandQueue,
     pub(super) transfer_queue: D::CommandQueue,
 
+    pub(super) uploader: D::ResourceUploader,
+
     pub(super) mapper: ResourceMapper<D>,
 }
 
@@ -21,11 +23,14 @@ impl<D: RenderResourceDevice + RenderCommandDevice> Context<D> {
         let compute_queue = gpu.create_command_queue(CommandType::Compute, None);
         let transfer_queue = gpu.create_command_queue(CommandType::Transfer, None);
 
+        let uploader = gpu.create_resource_uploader();
+
         Self {
             gpu,
             graphics_queue,
             compute_queue,
             transfer_queue,
+            uploader,
             mapper: ResourceMapper::default(),
         }
     }
