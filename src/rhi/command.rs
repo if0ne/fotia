@@ -8,6 +8,8 @@ pub trait RenderCommandDevice {
 
     fn create_event(&self, shared: bool) -> Self::Event;
     fn open_event(&self, event: &Self::Event, other_gpu: &Self) -> Self::Event;
+
+    fn wait_idle(&self);
 }
 
 pub trait RenderCommandQueue {
