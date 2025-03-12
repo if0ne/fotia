@@ -1,8 +1,8 @@
 pub type SyncPoint = u64;
 
 pub trait RenderCommandDevice {
-    type CommandQueue: RenderCommandQueue<Event = Self::Event>;
-    type Event: GpuEvent;
+    type CommandQueue;
+    type Event;
 
     fn create_command_queue(&self, ty: CommandType, capacity: Option<usize>) -> Self::CommandQueue;
 
@@ -13,8 +13,8 @@ pub trait RenderCommandDevice {
 }
 
 pub trait RenderCommandQueue {
-    type Event: GpuEvent;
-    type CommandBuffer: RenderCommandBuffer;
+    type Event;
+    type CommandBuffer;
 
     fn create_command_buffer(&self) -> Self::CommandBuffer;
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer);
@@ -27,6 +27,16 @@ pub trait RenderCommandQueue {
     fn wait_on_cpu(&self, value: SyncPoint);
     fn wait_until_complete(&self);
     fn wait_idle(&self);
+}
+
+pub trait RenderResourceUploader: RenderCommandQueue<CommandBuffer: IoCommandBuffer> {}
+
+pub trait IoCommandBuffer {
+    type Buffer;
+    type Texture;
+
+    fn load_to_buffer(&self, buffer: &Self::Buffer, data: &'_ [u8]);
+    fn load_to_texture(&self, texture: &Self::Texture, data: &'_ [u8]);
 }
 
 pub trait RenderCommandBuffer {}
