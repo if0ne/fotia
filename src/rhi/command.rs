@@ -1,7 +1,7 @@
 pub type SyncPoint = u64;
 
 pub trait RenderCommandDevice {
-    type CommandQueue;
+    type CommandQueue: RenderCommandQueue;
     type Event;
 
     fn create_command_queue(&self, ty: CommandType, capacity: Option<usize>) -> Self::CommandQueue;
