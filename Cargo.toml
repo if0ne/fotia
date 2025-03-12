@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 bitflags = "2.9.0"
 bytemuck = "1.22.0"
+parking_lot = "0.12.3"

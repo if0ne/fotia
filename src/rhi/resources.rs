@@ -11,7 +11,7 @@ pub trait RenderResourceDevice: Sized {
     fn destroy_buffer(&self, buffer: Self::Buffer);
 
     fn create_texture(&self, desc: TextureDesc) -> Self::Texture;
-    fn destroy_texture(&self, buffer: Self::Texture);
+    fn destroy_texture(&self, texture: Self::Texture);
 
     fn create_texture_view(&self, texture: &Self::Texture, desc: TextureViewDesc) -> Self::Texture;
 
