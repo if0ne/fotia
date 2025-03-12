@@ -8,17 +8,17 @@ use crate::{
 
 use super::resources::{Buffer, ResourceMapper, Sampler, Texture};
 
-pub struct Context<D: RenderResourceDevice, CQ> {
+pub struct Context<D: RenderResourceDevice + RenderCommandDevice> {
     gpu: D,
 
-    graphics_queue: CQ,
-    compute_queue: CQ,
-    transfer_queue: CQ,
+    graphics_queue: D::CommandQueue,
+    compute_queue: D::CommandQueue,
+    transfer_queue: D::CommandQueue,
 
     mapper: ResourceMapper<D>,
 }
 
-impl<D: RenderResourceDevice + RenderCommandDevice> Context<D, D::CommandQueue> {
+impl<D: RenderResourceDevice + RenderCommandDevice> Context<D> {
     pub fn new(gpu: D) -> Self {
         let graphics_queue = gpu.create_command_queue(CommandType::Graphics, None);
         let compute_queue = gpu.create_command_queue(CommandType::Compute, None);
@@ -56,7 +56,7 @@ pub trait RenderContext {
     fn unbind_sampler(&self, handle: Handle<Sampler>);
 }
 
-impl<D: RenderResourceDevice, CQ> RenderContext for Context<D, CQ> {
+impl<D: RenderResourceDevice + RenderCommandDevice> RenderContext for Context<D> {
     fn bind_buffer(&self, handle: Handle<Buffer>, desc: BufferDesc, _init_data: Option<&[u8]>) {
         let buffer = self.gpu.create_buffer(desc);
         self.mapper.buffers.lock().set(handle, buffer);
@@ -119,5 +119,29 @@ impl<D: RenderResourceDevice, CQ> RenderContext for Context<D, CQ> {
         };
 
         self.gpu.destroy_sampler(sampler);
+    }
+}
+
+pub struct ContextDual<D: RenderResourceDevice + RenderCommandDevice> {
+    primary: Context<D>,
+    secondary: Context<D>,
+}
+
+impl<D: RenderResourceDevice + RenderCommandDevice> ContextDual<D> {
+    pub fn new(primary: Context<D>, secondary: Context<D>) -> Self {
+        Self { primary, secondary }
+    }
+
+    pub fn call(&self, func: impl Fn(&Context<D>)) {
+        func(&self.primary);
+        func(&self.secondary);
+    }
+
+    pub fn call_primary(&self, func: impl Fn(&Context<D>)) {
+        func(&self.primary);
+    }
+
+    pub fn call_secondary(&self, func: impl Fn(&Context<D>)) {
+        func(&self.secondary);
     }
 }

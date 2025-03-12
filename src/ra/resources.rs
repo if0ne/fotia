@@ -11,7 +11,6 @@ pub struct Texture;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Sampler;
 
-#[derive(Debug)]
 pub(super) struct ResourceMapper<D: RenderResourceDevice> {
     pub(super) buffers: Mutex<SparseArray<Buffer, D::Buffer>>,
     pub(super) textures: Mutex<SparseArray<Texture, D::Texture>>,
