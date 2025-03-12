@@ -89,32 +89,32 @@ impl<U, W> SparseArray<U, W> {
     }
 
     pub fn remove(&mut self, handle: Handle<U>) -> Option<W> {
-        /*let Some(Some(sparse_h)) = self.sparse.get(handle.index as usize) else {
+        let Some(Some(SparseEntry {
+            dense_index,
+            dense_cookie,
+        })) = self.sparse.get(handle.index as usize).cloned()
+        else {
             return None;
         };
 
-        if sparse_h.dense_cookie != handle.cookie {
+        if dense_cookie != handle.cookie {
             return None;
         }
 
-        let dense_pos = sparse_h.dense_index;
+        let value = std::mem::replace(&mut self.dense[dense_index], MaybeUninit::uninit());
+        let value = unsafe { value.assume_init() };
 
-        unsafe {
-            self.dense[dense_pos].assume_init_drop();
-        }
-
-        self.dense.swap_remove(dense_pos);
-        self.dense_to_sparse.swap_remove(dense_pos);
+        self.dense.swap_remove(dense_index);
+        self.dense_to_sparse.swap_remove(dense_index);
         self.sparse[handle.index as usize] = None;
 
-        if self.dense_to_sparse.len() > 0 {
-            let Some(Some(handle)) = self.sparse.get_mut(self.dense_to_sparse[dense_pos]) else {
-                return;
-            };
+        let Some(Some(handle)) = self.sparse.get_mut(self.dense_to_sparse[dense_index]) else {
+            return Some(value);
+        };
 
-            handle.dense_index = dense_pos;
-        }*/
-        todo!()
+        handle.dense_index = dense_index;
+
+        Some(value)
     }
 }
 
