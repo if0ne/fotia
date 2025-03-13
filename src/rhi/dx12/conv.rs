@@ -17,13 +17,12 @@ pub(super) fn map_command_buffer_type(ty: CommandType) -> dx::CommandListType {
 pub(super) fn map_format(format: Format) -> dx::Format {
     match format {
         Format::Unknown => dx::Format::Unknown,
-
         Format::R32 => dx::Format::R32Float,
         Format::Rg32 => dx::Format::Rg32Float,
         Format::Rgb32 => dx::Format::Rgb32Float,
         Format::Rgba32 => dx::Format::Rgba32Float,
-
         Format::Rgba8Unorm => dx::Format::Rgba8Unorm,
+        Format::Rgba8 => dx::Format::Rgba8Uint,
     }
 }
 

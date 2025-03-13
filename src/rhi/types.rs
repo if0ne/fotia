@@ -8,6 +8,8 @@ pub enum Format {
     Rg32,
     Rgb32,
     Rgba32,
+
+    Rgba8,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]

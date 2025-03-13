@@ -1,6 +1,5 @@
 use std::{
     collections::VecDeque,
-    future::pending,
     sync::{Arc, atomic::AtomicU64},
 };
 
@@ -329,9 +328,10 @@ impl RenderCommandQueue<DxDevice> for DxResourceUploader {
 
         {
             let mut guard = self.staging.lock();
+
             let idx = guard
                 .iter()
-                .take_while(|res| res.sync_point >= completed)
+                .take_while(|res| res.sync_point <= completed)
                 .count();
 
             if idx > 0 {
@@ -406,13 +406,14 @@ impl IoCommandBuffer for DxIoCommandBuffer {
             &staging.raw,
             0,
             0..1,
-            &[dx::SubresourceData::new(data)],
+            &[dx::SubresourceData::new(data).with_row_pitch(4 * texture.desc.extent[0] as usize)], // TODO: Calc block size
         );
 
         self.temps.push(staging);
     }
 }
 
+#[derive(Debug)]
 struct ResourceEntry {
     res: DxBuffer,
     sync_point: SyncPoint,

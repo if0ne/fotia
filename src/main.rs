@@ -5,7 +5,8 @@ use ra::{
 };
 use rhi::{
     backend::{Api, DebugFlags},
-    resources::{BufferUsages, TextureUsages},
+    resources::TextureUsages,
+    types::Format,
 };
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -32,48 +33,24 @@ fn main() {
 
     let group = ContextDual::new(primary, secondary);
 
-    let buffer = rs.create_buffer_handle();
+    let image = image::open("../assets/texture.jpg")
+        .expect("failed to load image")
+        .to_rgba8();
+    let bytes = image.as_raw();
+
     let texture = rs.create_texture_handle();
 
     group.call(|ctx| {
-        ctx.bind_buffer(
-            buffer,
-            rhi::resources::BufferDesc::gpu_to_gpu(128, BufferUsages::Vertex),
-            Some(&vec![0u8; 128]),
-        );
-
-        ctx.unbind_buffer(buffer);
-
         ctx.bind_texture(
             texture,
             rhi::resources::TextureDesc::new_2d(
-                [800, 600],
-                rhi::types::Format::R32,
-                TextureUsages::RenderTarget | TextureUsages::Shared,
+                [image.width(), image.height()],
+                Format::Rgba8,
+                TextureUsages::Resource,
             ),
-            None,
+            Some(&bytes),
         );
 
         ctx.unbind_texture(texture);
     });
-
-    let texture = rs.create_texture_handle();
-
-    group.call_primary(|ctx| {
-        ctx.bind_texture(
-            texture,
-            rhi::resources::TextureDesc::new_2d(
-                [800, 600],
-                rhi::types::Format::R32,
-                TextureUsages::RenderTarget | TextureUsages::Shared,
-            ),
-            None,
-        );
-    });
-
-    group.call_secondary(|ctx| {
-        ctx.open_texture_handle(texture, &group.primary);
-    });
-
-    group.call(|ctx| ctx.unbind_texture(texture));
 }

@@ -1,5 +1,5 @@
 use crate::rhi::{
-    command::{CommandType, RenderCommandDevice},
+    command::{CommandType, RenderCommandDevice, RenderCommandQueue},
     resources::RenderResourceDevice,
 };
 
@@ -33,6 +33,13 @@ impl<D: RenderResourceDevice + RenderCommandDevice> Context<D> {
             uploader,
             mapper: ResourceMapper::default(),
         }
+    }
+
+    pub fn wait_idle(&self) {
+        self.graphics_queue.wait_idle();
+        self.compute_queue.wait_idle();
+        self.transfer_queue.wait_idle();
+        self.uploader.wait_idle();
     }
 }
 
