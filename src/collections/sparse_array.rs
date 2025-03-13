@@ -108,7 +108,11 @@ impl<U, W> SparseArray<U, W> {
         self.dense_to_sparse.swap_remove(dense_index);
         self.sparse[handle.index as usize] = None;
 
-        let Some(Some(handle)) = self.sparse.get_mut(self.dense_to_sparse[dense_index]) else {
+        let Some(Some(handle)) = self
+            .dense_to_sparse
+            .get(dense_index)
+            .and_then(|idx| self.sparse.get_mut(*idx))
+        else {
             return Some(value);
         };
 

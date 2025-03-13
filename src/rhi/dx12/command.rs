@@ -2,7 +2,7 @@ use crate::rhi::command::{
     IoCommandBuffer, RenderCommandDevice, RenderCommandQueue, RenderResourceUploader,
 };
 
-use super::device::DxDevice;
+use super::{device::DxDevice, resources::DxBuffer};
 
 impl RenderCommandDevice for DxDevice {
     type ResourceUploader = DxResourceUploader;
@@ -125,7 +125,7 @@ impl RenderResourceUploader<DxDevice> for DxResourceUploader {}
 pub struct DxIoCommandBuffer {}
 
 impl IoCommandBuffer<DxDevice> for DxIoCommandBuffer {
-    fn load_to_buffer(&self, buffer: &(), data: &'_ [u8]) {
+    fn load_to_buffer(&self, buffer: &DxBuffer, data: &'_ [u8]) {
         todo!()
     }
 

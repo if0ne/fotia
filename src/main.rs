@@ -1,8 +1,12 @@
 use ra::{
     context::ContextDual,
+    resources::RenderResourceContext,
     system::{RenderBackend, RenderBackendSettings, RenderSystem},
 };
-use rhi::backend::{Api, DebugFlags};
+use rhi::{
+    backend::{Api, DebugFlags},
+    resources::BufferUsages,
+};
 use tracing_subscriber::layer::SubscriberExt;
 
 pub mod collections;
@@ -27,4 +31,16 @@ fn main() {
     let secondary = backend.create_device(1);
 
     let group = ContextDual::new(primary, secondary);
+
+    let buffer = rs.create_buffer_handle();
+
+    group.call(|ctx| {
+        ctx.bind_buffer(
+            buffer,
+            rhi::resources::BufferDesc::cpu_to_gpu(128, BufferUsages::Uniform),
+            None,
+        );
+
+        ctx.unbind_buffer(buffer);
+    });
 }

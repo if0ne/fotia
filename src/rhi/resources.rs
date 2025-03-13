@@ -87,6 +87,7 @@ bitflags::bitflags! {
         const Vertex = 1 << 2;
         const Index = 1 << 3;
         const Storage = 1 << 4;
+        const QueryResolve = 1 << 5;
     }
 }
 
