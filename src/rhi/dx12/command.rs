@@ -14,11 +14,11 @@ impl RenderCommandDevice for DxDevice {
         ty: crate::rhi::command::CommandType,
         capacity: Option<usize>,
     ) -> Self::CommandQueue {
-        todo!()
+        DxCommandQueue {}
     }
 
     fn create_resource_uploader(&self) -> Self::ResourceUploader {
-        todo!()
+        DxResourceUploader {}
     }
 
     fn create_event(&self, shared: bool) -> Self::Event {

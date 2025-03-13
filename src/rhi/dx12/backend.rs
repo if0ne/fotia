@@ -185,7 +185,11 @@ impl Api for DxBackend {
     }
 
     fn create_device(&self, index: RenderDeviceId) -> Self::Device {
-        todo!()
+        DxDevice::new(
+            self.adapters[index].clone(),
+            self.factory.clone(),
+            self.adapter_infos[index].clone(),
+        )
     }
 
     fn compile_shader(&self, desc: ShaderDesc) -> CompiledShader {
