@@ -26,3 +26,13 @@ pub struct RenderDeviceInfo {
     pub is_uma: bool,
     pub ty: DeviceType,
 }
+
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct DebugFlags: u32 {
+        const CpuValidation = 0x1;
+        const GpuValidation = 0x2;
+        const RenderDoc = 0x4;
+        const Pix = 0x8;
+    }
+}

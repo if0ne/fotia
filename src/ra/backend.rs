@@ -7,8 +7,15 @@ use crate::rhi::{
 
 use super::context::Context;
 
+#[derive(Debug)]
 pub struct Backend<A: Api> {
     api: A,
+}
+
+impl<A: Api> Backend<A> {
+    pub fn new(api: A) -> Self {
+        Self { api }
+    }
 }
 
 impl<A: Api<Device: RenderCommandDevice + RenderResourceDevice>> Api for Backend<A> {

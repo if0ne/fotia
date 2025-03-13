@@ -1,6 +1,12 @@
-use crate::collections::handle::Handle;
+use std::sync::Arc;
+
+use crate::{
+    collections::handle::Handle,
+    rhi::{backend::DebugFlags, dx12::backend::DxBackend},
+};
 
 use super::{
+    backend::Backend,
     container::HandleContainer,
     resources::{Buffer, Sampler, Texture},
 };
@@ -8,13 +14,26 @@ use super::{
 #[derive(Debug)]
 pub struct RenderSystem {
     pub(super) handles: HandleContainer,
+
+    pub(super) dx_backend: Option<Arc<Backend<DxBackend>>>,
 }
 
 impl RenderSystem {
     pub fn new(backend_settings: &[RenderBackendSettings]) -> Self {
+        let dx_backend = backend_settings
+            .iter()
+            .find(|b| b.api == RenderBackend::Dx12)
+            .and_then(|settings| Some(Arc::new(Backend::new(DxBackend::new(settings.debug)))));
+
         Self {
+            dx_backend,
             handles: HandleContainer::new(),
         }
+    }
+
+    #[inline]
+    pub fn dx_backend(&self) -> Option<Arc<Backend<DxBackend>>> {
+        self.dx_backend.clone()
     }
 
     #[inline]
@@ -57,14 +76,4 @@ pub struct RenderBackendSettings {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RenderBackend {
     Dx12,
-}
-
-bitflags::bitflags! {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub struct DebugFlags: u32 {
-        const CpuValidation = 0x1;
-        const GpuValidation = 0x2;
-        const RenderDoc = 0x4;
-        const Pix = 0x8;
-    }
 }
