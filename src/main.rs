@@ -5,7 +5,7 @@ use ra::{
 };
 use rhi::{
     backend::{Api, DebugFlags},
-    resources::BufferUsages,
+    resources::{BufferUsages, TextureUsages},
 };
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -33,6 +33,7 @@ fn main() {
     let group = ContextDual::new(primary, secondary);
 
     let buffer = rs.create_buffer_handle();
+    let texture = rs.create_texture_handle();
 
     group.call(|ctx| {
         ctx.bind_buffer(
@@ -42,5 +43,17 @@ fn main() {
         );
 
         ctx.unbind_buffer(buffer);
+
+        ctx.bind_texture(
+            texture,
+            rhi::resources::TextureDesc::new_2d(
+                [800, 600],
+                rhi::types::Format::R32,
+                TextureUsages::RenderTarget | TextureUsages::Shared,
+            ),
+            None,
+        );
+
+        ctx.unbind_texture(texture);
     });
 }

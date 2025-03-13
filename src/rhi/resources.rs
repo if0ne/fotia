@@ -166,6 +166,38 @@ impl TextureDesc {
         self.mip_levels = mip_levels;
         self
     }
+
+    pub fn subresource_count(&self) -> u32 {
+        let array = match self.ty {
+            TextureType::D1 => 1,
+            TextureType::D1Array => self.extent[2],
+            TextureType::D2 => 1,
+            TextureType::D2Array => self.extent[2],
+            TextureType::D3 => 1,
+        };
+
+        array * self.mip_levels as u32
+    }
+
+    pub fn to_default_view(&self) -> TextureViewDesc {
+        let view_ty = if self.usage.contains(TextureUsages::RenderTarget) {
+            TextureViewType::RenderTarget
+        } else if self.usage.contains(TextureUsages::DepthTarget) {
+            TextureViewType::DepthStencil
+        } else if self.usage.contains(TextureUsages::Storage) {
+            TextureViewType::Storage
+        } else {
+            TextureViewType::ShaderResource
+        };
+
+        TextureViewDesc {
+            view_ty,
+            format: None,
+            ty: None,
+            mips: None,
+            array: None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -189,8 +221,18 @@ bitflags::bitflags! {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum TextureViewType {
+    RenderTarget,
+    DepthStencil,
+    #[default]
+    ShaderResource,
+    Storage,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct TextureViewDesc {
+    pub view_ty: TextureViewType,
     pub format: Option<Format>,
     pub ty: Option<TextureType>,
     pub mips: Option<Range<u16>>,
@@ -198,6 +240,11 @@ pub struct TextureViewDesc {
 }
 
 impl TextureViewDesc {
+    pub fn with_view_type(mut self, ty: TextureViewType) -> Self {
+        self.view_ty = ty;
+        self
+    }
+
     pub fn with_format(mut self, format: Format) -> Self {
         self.format = Some(format);
         self
@@ -208,8 +255,8 @@ impl TextureViewDesc {
         self
     }
 
-    pub fn with_mips(mut self, mips: Range<u16>) -> Self {
-        self.mips = Some(mips);
+    pub fn with_mips(mut self, mip: Range<u16>) -> Self {
+        self.mips = Some(mip);
         self
     }
 
