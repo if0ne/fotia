@@ -38,8 +38,8 @@ fn main() {
     group.call(|ctx| {
         ctx.bind_buffer(
             buffer,
-            rhi::resources::BufferDesc::cpu_to_gpu(128, BufferUsages::Uniform),
-            None,
+            rhi::resources::BufferDesc::gpu_to_gpu(128, BufferUsages::Vertex),
+            Some(&vec![0u8; 128]),
         );
 
         ctx.unbind_buffer(buffer);

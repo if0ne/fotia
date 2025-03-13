@@ -46,10 +46,10 @@ impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Co
         let buffer = self.gpu.create_buffer(desc);
 
         if let Some(init_data) = init_data {
-            let cmd = self.uploader.create_command_buffer();
-            cmd.load_to_buffer(&buffer, init_data);
+            let mut cmd = self.uploader.create_command_buffer();
+            cmd.load_to_buffer(&self.gpu, &buffer, init_data);
             self.uploader.commit(cmd);
-            self.uploader.wait_on_cpu(self.uploader.submit());
+            self.uploader.wait_on_cpu(self.uploader.submit(&self.gpu));
         }
 
         if let Some(buffer) = self.mapper.buffers.lock().set(handle, buffer) {
@@ -69,10 +69,10 @@ impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Co
         let texture = self.gpu.create_texture(desc);
 
         if let Some(init_data) = init_data {
-            let cmd = self.uploader.create_command_buffer();
-            cmd.load_to_texture(&texture, init_data);
+            let mut cmd = self.uploader.create_command_buffer();
+            cmd.load_to_texture(&self.gpu, &texture, init_data);
             self.uploader.commit(cmd);
-            self.uploader.wait_on_cpu(self.uploader.submit());
+            self.uploader.wait_on_cpu(self.uploader.submit(&self.gpu));
         }
 
         if let Some(texture) = self.mapper.textures.lock().set(handle, texture) {

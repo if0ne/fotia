@@ -1,16 +1,21 @@
 use std::{
     collections::VecDeque,
+    future::pending,
     sync::{Arc, atomic::AtomicU64},
 };
 
 use oxidx::dx::{
-    self, ICommandAllocator, ICommandQueue, IDevice, IFence, IGraphicsCommandList, PSO_NONE,
+    self, ICommandAllocator, ICommandQueue, IDevice, IFence, IGraphicsCommandList,
+    IGraphicsCommandListExt, PSO_NONE,
 };
 use parking_lot::Mutex;
 
-use crate::rhi::command::{
-    CommandType, GpuEvent, IoCommandBuffer, RenderCommandDevice, RenderCommandQueue,
-    RenderResourceUploader, SyncPoint,
+use crate::rhi::{
+    command::{
+        CommandType, GpuEvent, IoCommandBuffer, RenderCommandDevice, RenderCommandQueue,
+        RenderResourceUploader, SyncPoint,
+    },
+    resources::{BufferDesc, BufferUsages, MemoryLocation, RenderResourceDevice},
 };
 
 use super::{
@@ -76,7 +81,13 @@ impl RenderCommandDevice for DxDevice {
 
     fn create_resource_uploader(&self) -> Self::ResourceUploader {
         let queue = self.create_command_queue(CommandType::Transfer, None);
-        DxResourceUploader { queue }
+
+        DxResourceUploader {
+            queue,
+            staging: Default::default(),
+            pending: Default::default(),
+            res_pool: Default::default(),
+        }
     }
 
     fn create_event(&self, shared: bool) -> Self::Event {
@@ -140,7 +151,7 @@ pub struct DxCommandQueue {
     pub(crate) queue: Mutex<dx::CommandQueue>,
 }
 
-impl RenderCommandQueue for DxCommandQueue {
+impl RenderCommandQueue<DxDevice> for DxCommandQueue {
     type Event = DxFence;
     type CommandBuffer = DxCommandBuffer;
 
@@ -205,13 +216,7 @@ impl RenderCommandQueue for DxCommandQueue {
         self.pending.lock().push(cmd_buffer);
     }
 
-    fn submit(&self) -> SyncPoint {
-        {
-            let mut guard = self.in_record.lock();
-            let in_record = guard.drain(..);
-            self.pending.lock().extend(in_record);
-        }
-
+    fn submit(&self, _: &DxDevice) -> SyncPoint {
         let cmd_buffers = self.pending.lock().drain(..).collect::<Vec<_>>();
         let lists = cmd_buffers
             .iter()
@@ -280,46 +285,85 @@ struct CommandAllocatorEntry {
 
 pub struct DxResourceUploader {
     queue: DxCommandQueue,
+    staging: Mutex<Vec<ResourceEntry>>,
+
+    pending: Mutex<Vec<Vec<DxBuffer>>>,
+    res_pool: Mutex<Vec<Vec<DxBuffer>>>,
 }
 
-impl RenderCommandQueue for DxResourceUploader {
-    type Event = ();
+impl RenderCommandQueue<DxDevice> for DxResourceUploader {
+    type Event = DxFence;
     type CommandBuffer = DxIoCommandBuffer;
 
     fn create_command_buffer(&self) -> Self::CommandBuffer {
-        todo!()
+        let buffer = self.queue.create_command_buffer();
+        let temps = self.res_pool.lock().pop().unwrap_or_default();
+
+        DxIoCommandBuffer { buffer, temps }
     }
 
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer) {
-        todo!()
+        self.res_pool.lock().push(cmd_buffer.temps);
+        self.queue.enqueue(cmd_buffer.buffer);
     }
 
     fn commit(&self, cmd_buffer: Self::CommandBuffer) {
-        todo!()
+        self.pending.lock().push(cmd_buffer.temps);
+        self.queue.commit(cmd_buffer.buffer);
     }
 
-    fn submit(&self) -> SyncPoint {
-        todo!()
+    fn submit(&self, device: &DxDevice) -> SyncPoint {
+        let value = self.queue.submit(device);
+
+        {
+            let mut guard = self.pending.lock();
+            let pendings = guard.drain(..).flatten().map(|res| ResourceEntry {
+                res,
+                sync_point: value,
+            });
+
+            self.staging.lock().extend(pendings);
+        }
+
+        let completed = self.queue.fence.get_completed_value();
+
+        {
+            let mut guard = self.staging.lock();
+            let idx = guard
+                .iter()
+                .take_while(|res| res.sync_point >= completed)
+                .count();
+
+            if idx > 0 {
+                let drained = guard.drain(0..idx);
+
+                for buffer in drained {
+                    device.destroy_buffer(buffer.res);
+                }
+            }
+        }
+
+        value
     }
 
     fn signal_event(&self, event: &Self::Event) -> SyncPoint {
-        todo!()
+        self.queue.signal_event(event)
     }
 
     fn wait_event(&self, event: &Self::Event) {
-        todo!()
+        self.queue.wait_event(event);
     }
 
     fn wait_on_cpu(&self, value: SyncPoint) {
-        todo!()
+        self.queue.wait_on_cpu(value);
     }
 
     fn wait_until_complete(&self) {
-        todo!()
+        self.queue.wait_until_complete();
     }
 
     fn wait_idle(&self) {
-        todo!()
+        self.queue.wait_idle();
     }
 }
 
@@ -328,16 +372,50 @@ impl RenderResourceUploader<DxDevice> for DxResourceUploader {}
 #[derive(Debug)]
 pub struct DxIoCommandBuffer {
     buffer: DxCommandBuffer,
+    temps: Vec<DxBuffer>,
 }
 
-impl IoCommandBuffer<DxDevice> for DxIoCommandBuffer {
-    fn load_to_buffer(&self, buffer: &DxBuffer, data: &'_ [u8]) {
-        todo!()
+impl IoCommandBuffer for DxIoCommandBuffer {
+    type Device = DxDevice;
+
+    fn load_to_buffer(&mut self, device: &Self::Device, buffer: &DxBuffer, data: &'_ [u8]) {
+        if buffer.desc.memory_location == MemoryLocation::CpuToGpu || device.desc.is_uma {
+            let map = buffer.map();
+            map.pointer.clone_from_slice(data);
+        } else {
+            let staging =
+                device.create_buffer(BufferDesc::cpu_to_gpu(buffer.desc.size, BufferUsages::Copy));
+
+            {
+                let map = staging.map();
+                map.pointer.clone_from_slice(data);
+            }
+
+            self.buffer.list.copy_resource(&buffer.raw, &staging.raw);
+
+            self.temps.push(staging);
+        }
     }
 
-    fn load_to_texture(&self, texture: &DxTexture, data: &'_ [u8]) {
-        todo!()
+    fn load_to_texture(&mut self, device: &Self::Device, texture: &DxTexture, data: &'_ [u8]) {
+        let staging =
+            device.create_buffer(BufferDesc::cpu_to_gpu(texture.size, BufferUsages::Copy));
+
+        self.buffer.list.update_subresources_fixed::<1, _, _>(
+            &texture.raw,
+            &staging.raw,
+            0,
+            0..1,
+            &[dx::SubresourceData::new(data)],
+        );
+
+        self.temps.push(staging);
     }
+}
+
+struct ResourceEntry {
+    res: DxBuffer,
+    sync_point: SyncPoint,
 }
 
 #[derive(Debug)]
