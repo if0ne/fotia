@@ -25,8 +25,8 @@ pub trait RenderCommandQueue {
     fn commit(&self, cmd_buffer: Self::CommandBuffer);
     fn submit(&self) -> SyncPoint;
 
-    fn signal_event(&self, event: Self::Event, value: SyncPoint);
-    fn wait_event(&self, event: Self::Event, value: SyncPoint);
+    fn signal_event(&self, event: &Self::Event) -> SyncPoint;
+    fn wait_event(&self, event: &Self::Event);
 
     fn wait_on_cpu(&self, value: SyncPoint);
     fn wait_until_complete(&self);
