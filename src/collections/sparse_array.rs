@@ -38,17 +38,19 @@ impl<U, W> SparseArray<U, W> {
             .is_some_and(|h| h.is_some_and(|h| h.dense_cookie == handle.cookie))
     }
 
-    pub fn set(&mut self, handle: Handle<U>, value: W) {
+    pub fn set(&mut self, handle: Handle<U>, value: W) -> Option<W> {
         if self.sparse.len() <= handle.index as usize {
             self.sparse.resize((handle.index + 1) as usize, None);
         }
 
         if let Some(ref mut h) = self.sparse[handle.index as usize] {
-            unsafe {
-                self.dense[h.dense_index as usize].assume_init_drop();
-            }
+            let value = std::mem::replace(
+                &mut self.dense[h.dense_index as usize],
+                MaybeUninit::new(value),
+            );
+
             h.dense_cookie = handle.cookie;
-            self.dense[h.dense_index as usize] = MaybeUninit::new(value);
+            unsafe { Some(value.assume_init()) }
         } else {
             let pos = self.dense.len();
             self.dense.push(MaybeUninit::new(value));
@@ -57,6 +59,8 @@ impl<U, W> SparseArray<U, W> {
                 dense_index: pos,
                 dense_cookie: handle.cookie,
             });
+
+            None
         }
     }
 

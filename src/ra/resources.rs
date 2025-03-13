@@ -52,7 +52,9 @@ impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Co
             self.uploader.wait_on_cpu(self.uploader.submit());
         }
 
-        self.mapper.buffers.lock().set(handle, buffer);
+        if let Some(buffer) = self.mapper.buffers.lock().set(handle, buffer) {
+            self.gpu.destroy_buffer(buffer);
+        }
     }
 
     fn unbind_buffer(&self, handle: Handle<Buffer>) {
@@ -73,7 +75,9 @@ impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Co
             self.uploader.wait_on_cpu(self.uploader.submit());
         }
 
-        self.mapper.textures.lock().set(handle, texture);
+        if let Some(texture) = self.mapper.textures.lock().set(handle, texture) {
+            self.gpu.destroy_texture(texture);
+        }
     }
 
     fn unbind_texture(&self, handle: Handle<Texture>) {
@@ -96,7 +100,9 @@ impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Co
         };
 
         let texture = self.gpu.create_texture_view(texture, desc);
-        guard.set(handle, texture);
+        if let Some(view) = guard.set(handle, texture) {
+            self.gpu.destroy_texture(view);
+        }
     }
 
     fn open_texture_handle(&self, handle: Handle<Texture>, other: &Self) {
@@ -111,7 +117,10 @@ impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Co
 
     fn bind_sampler(&self, handle: Handle<Sampler>, desc: SamplerDesc) {
         let sampler = self.gpu.create_sampler(desc);
-        self.mapper.sampler.lock().set(handle, sampler);
+
+        if let Some(sampler) = self.mapper.sampler.lock().set(handle, sampler) {
+            self.gpu.destroy_sampler(sampler);
+        }
     }
 
     fn unbind_sampler(&self, handle: Handle<Sampler>) {
