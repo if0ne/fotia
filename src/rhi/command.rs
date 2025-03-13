@@ -1,7 +1,9 @@
+use super::resources::RenderResourceDevice;
+
 pub type SyncPoint = u64;
 
-pub trait RenderCommandDevice {
-    type ResourceUploader: RenderResourceUploader;
+pub trait RenderCommandDevice: RenderResourceDevice {
+    type ResourceUploader: RenderResourceUploader<Self>;
     type CommandQueue: RenderCommandQueue;
     type Event;
 
@@ -31,14 +33,14 @@ pub trait RenderCommandQueue {
     fn wait_idle(&self);
 }
 
-pub trait RenderResourceUploader: RenderCommandQueue<CommandBuffer: IoCommandBuffer> {}
+pub trait RenderResourceUploader<D: RenderResourceDevice>:
+    RenderCommandQueue<CommandBuffer: IoCommandBuffer<D>>
+{
+}
 
-pub trait IoCommandBuffer {
-    type Buffer;
-    type Texture;
-
-    fn load_to_buffer(&self, buffer: &Self::Buffer, data: &'_ [u8]);
-    fn load_to_texture(&self, texture: &Self::Texture, data: &'_ [u8]);
+pub trait IoCommandBuffer<D: RenderResourceDevice> {
+    fn load_to_buffer(&self, buffer: &D::Buffer, data: &'_ [u8]);
+    fn load_to_texture(&self, texture: &D::Texture, data: &'_ [u8]);
 }
 
 pub trait RenderCommandBuffer {}

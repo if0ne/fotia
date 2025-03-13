@@ -26,7 +26,6 @@ pub enum MemoryLocation {
     CpuToGpu,
     GpuToGpu,
     GpuToCpu,
-    SharedGpu,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

@@ -3,7 +3,7 @@ use parking_lot::Mutex;
 use crate::{
     collections::{handle::Handle, sparse_array::SparseArray},
     rhi::{
-        command::RenderCommandDevice,
+        command::{IoCommandBuffer, RenderCommandDevice, RenderCommandQueue},
         resources::{BufferDesc, RenderResourceDevice, SamplerDesc, TextureDesc, TextureViewDesc},
     },
 };
@@ -42,8 +42,16 @@ pub trait RenderResourceContext {
 }
 
 impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Context<D> {
-    fn bind_buffer(&self, handle: Handle<Buffer>, desc: BufferDesc, _init_data: Option<&[u8]>) {
+    fn bind_buffer(&self, handle: Handle<Buffer>, desc: BufferDesc, init_data: Option<&[u8]>) {
         let buffer = self.gpu.create_buffer(desc);
+
+        if let Some(init_data) = init_data {
+            let cmd = self.uploader.create_command_buffer();
+            cmd.load_to_buffer(&buffer, init_data);
+            self.uploader.commit(cmd);
+            self.uploader.wait_on_cpu(self.uploader.submit());
+        }
+
         self.mapper.buffers.lock().set(handle, buffer);
     }
 
@@ -55,8 +63,16 @@ impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Co
         self.gpu.destroy_buffer(buffer);
     }
 
-    fn bind_texture(&self, handle: Handle<Texture>, desc: TextureDesc, _init_data: Option<&[u8]>) {
+    fn bind_texture(&self, handle: Handle<Texture>, desc: TextureDesc, init_data: Option<&[u8]>) {
         let texture = self.gpu.create_texture(desc);
+
+        if let Some(init_data) = init_data {
+            let cmd = self.uploader.create_command_buffer();
+            cmd.load_to_texture(&texture, init_data);
+            self.uploader.commit(cmd);
+            self.uploader.wait_on_cpu(self.uploader.submit());
+        }
+
         self.mapper.textures.lock().set(handle, texture);
     }
 
