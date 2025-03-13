@@ -1,13 +1,9 @@
-use super::{
-    command::RenderCommandDevice,
-    resources::RenderResourceDevice,
-    shader::{CompiledShader, RenderShaderDevice, ShaderDesc},
-};
+use super::shader::{CompiledShader, ShaderDesc};
 
 pub type RenderDeviceId = usize;
 
 pub trait Api {
-    type Device: RenderResourceDevice + RenderCommandDevice + RenderShaderDevice;
+    type Device;
 
     fn enumerate_devices(&self) -> impl Iterator<Item = &RenderDeviceInfo> + '_;
     fn create_device(&self, index: RenderDeviceId) -> Self::Device;
