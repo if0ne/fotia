@@ -406,7 +406,9 @@ impl IoCommandBuffer for DxIoCommandBuffer {
             &staging.raw,
             0,
             0..1,
-            &[dx::SubresourceData::new(data).with_row_pitch(4 * texture.desc.extent[0] as usize)], // TODO: Calc block size
+            &[dx::SubresourceData::new(data).with_row_pitch(
+                texture.desc.format.bytes_per_pixel() * texture.desc.extent[0] as usize,
+            )],
         );
 
         self.temps.push(staging);

@@ -12,6 +12,20 @@ pub enum Format {
     Rgba8,
 }
 
+impl Format {
+    pub fn bytes_per_pixel(&self) -> usize {
+        match self {
+            Format::Unknown => 0,
+            Format::Rgba8Unorm => 4,
+            Format::R32 => 4,
+            Format::Rg32 => 8,
+            Format::Rgb32 => 12,
+            Format::Rgba32 => 16,
+            Format::Rgba8 => 4,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Filter {
     #[default]
