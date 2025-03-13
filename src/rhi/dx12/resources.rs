@@ -113,7 +113,36 @@ impl RenderResourceDevice for DxDevice {
     }
 
     fn create_texture_view(&self, texture: &Self::Texture, desc: TextureViewDesc) -> Self::Texture {
-        todo!()
+        let descriptor = match desc.view_ty {
+            TextureViewType::RenderTarget => Some(self.descriptors.rtv_heap.lock().allocate(1)),
+            TextureViewType::DepthStencil => Some(self.descriptors.dsv_heap.lock().allocate(1)),
+            _ => None,
+        };
+
+        if let Some(descriptor) = &descriptor {
+            self.create_texture_view(descriptor, &texture.raw, &desc, &texture.desc);
+        }
+
+        DxTexture {
+            raw: texture.raw.clone(),
+            state: Mutex::new(dx::ResourceStates::Common),
+            desc: texture.desc.clone(),
+            flavor: match &texture.flavor {
+                TextureFlavor::Local => TextureFlavor::Local,
+                TextureFlavor::CrossAdapter { heap } => {
+                    TextureFlavor::CrossAdapter { heap: heap.clone() }
+                }
+                TextureFlavor::Binded { heap, cross, .. } => TextureFlavor::Binded {
+                    heap: heap.clone(),
+                    cross: cross.clone(),
+                    cross_state: Mutex::new(dx::ResourceStates::Common),
+                },
+            },
+            size: texture.size,
+            descriptor,
+            view: desc,
+            is_view: true,
+        }
     }
 
     fn open_texture(&self, texture: &Self::Texture, other_gpu: &Self) -> Self::Texture {
