@@ -28,7 +28,7 @@ fn main() {
     let backend = rs.dx_backend().expect("failed to get directx backend");
 
     let primary = backend.create_device(0);
-    let secondary = backend.create_device(1);
+    let secondary = backend.create_device(2);
 
     let group = ContextDual::new(primary, secondary);
 
@@ -56,4 +56,24 @@ fn main() {
 
         ctx.unbind_texture(texture);
     });
+
+    let texture = rs.create_texture_handle();
+
+    group.call_primary(|ctx| {
+        ctx.bind_texture(
+            texture,
+            rhi::resources::TextureDesc::new_2d(
+                [800, 600],
+                rhi::types::Format::R32,
+                TextureUsages::RenderTarget | TextureUsages::Shared,
+            ),
+            None,
+        );
+    });
+
+    group.call_secondary(|ctx| {
+        ctx.open_texture_handle(texture, &group.primary);
+    });
+
+    group.call(|ctx| ctx.unbind_texture(texture));
 }

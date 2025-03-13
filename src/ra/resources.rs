@@ -106,7 +106,7 @@ impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Co
     }
 
     fn open_texture_handle(&self, handle: Handle<Texture>, other: &Self) {
-        let mut guard = self.mapper.textures.lock();
+        let mut guard = other.mapper.textures.lock();
         let Some(texture) = guard.get(handle) else {
             panic!("texture doesn't exist")
         };

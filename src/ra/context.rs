@@ -37,8 +37,8 @@ impl<D: RenderResourceDevice + RenderCommandDevice> Context<D> {
 }
 
 pub struct ContextDual<D: RenderResourceDevice + RenderCommandDevice> {
-    primary: Context<D>,
-    secondary: Context<D>,
+    pub primary: Context<D>,
+    pub secondary: Context<D>,
 }
 
 impl<D: RenderResourceDevice + RenderCommandDevice> ContextDual<D> {

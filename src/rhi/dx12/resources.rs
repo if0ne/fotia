@@ -69,7 +69,32 @@ impl RenderResourceDevice for DxDevice {
 
     fn create_texture(&self, desc: TextureDesc) -> Self::Texture {
         if desc.usage.contains(TextureUsages::Shared) {
-            self.create_shared_texture(desc)
+            let raw_desc = map_texture_desc(&desc, self.desc.is_cross_adapter_texture_supported);
+
+            let raw_desc = if raw_desc
+                .flags()
+                .contains(dx::ResourceFlags::AllowCrossAdapter)
+            {
+                raw_desc.with_layout(dx::TextureLayout::RowMajor)
+            } else {
+                raw_desc
+                    .with_flags(dx::ResourceFlags::AllowCrossAdapter)
+                    .with_layout(dx::TextureLayout::RowMajor)
+            };
+
+            let size = self
+                .gpu
+                .get_copyable_footprints(&raw_desc, 0..1, 0, None, None, None);
+
+            let heap = self
+                .gpu
+                .create_heap(
+                    &dx::HeapDesc::new(size * 2, dx::HeapProperties::default())
+                        .with_flags(dx::HeapFlags::SharedCrossAdapter | dx::HeapFlags::Shared),
+                )
+                .expect("Failed to create shared heap");
+
+            self.create_shared_texture(desc, heap)
         } else {
             self.create_local_texture(desc)
         }
@@ -86,7 +111,36 @@ impl RenderResourceDevice for DxDevice {
     }
 
     fn open_texture(&self, texture: &Self::Texture, other_gpu: &Self) -> Self::Texture {
-        todo!()
+        let heap = match &texture.flavor {
+            TextureFlavor::Local => panic!("Texture is local, can not open handle"),
+            TextureFlavor::CrossAdapter { heap } => heap,
+            TextureFlavor::Binded { heap, .. } => heap,
+        };
+
+        let handle = other_gpu
+            .gpu
+            .create_shared_handle(heap, None)
+            .expect("Failed to open handle");
+        let open_heap: dx::Heap = self
+            .gpu
+            .open_shared_handle(handle)
+            .expect("Failed to open heap");
+        handle.close().expect("Failed to close handle");
+
+        self.create_shared_texture(
+            texture
+                .desc
+                .clone()
+                .with_name(std::borrow::Cow::Owned(format!(
+                    "{} Opened",
+                    texture
+                        .desc
+                        .name
+                        .as_ref()
+                        .unwrap_or(&std::borrow::Cow::Borrowed("Unnamed"))
+                ))),
+            open_heap,
+        )
     }
 
     fn create_sampler(&self, desc: SamplerDesc) -> Self::Sampler {
@@ -212,7 +266,7 @@ impl DxDevice {
         }
     }
 
-    fn create_shared_texture(&self, desc: TextureDesc) -> DxTexture {
+    fn create_shared_texture(&self, desc: TextureDesc, heap: dx::Heap) -> DxTexture {
         let raw_desc = map_texture_desc(&desc, self.desc.is_cross_adapter_texture_supported);
 
         let cross_adapter = raw_desc
@@ -225,14 +279,6 @@ impl DxDevice {
             let size = self
                 .gpu
                 .get_copyable_footprints(&raw_desc, 0..1, 0, None, None, None);
-
-            let heap = self
-                .gpu
-                .create_heap(
-                    &dx::HeapDesc::new(size * 2, dx::HeapProperties::default())
-                        .with_flags(dx::HeapFlags::SharedCrossAdapter | dx::HeapFlags::Shared),
-                )
-                .expect("Failed to create shared heap");
 
             let cross_res = self
                 .gpu
@@ -304,14 +350,6 @@ impl DxDevice {
             let size = self
                 .gpu
                 .get_copyable_footprints(&raw_desc, 0..1, 0, None, None, None);
-
-            let heap = self
-                .gpu
-                .create_heap(
-                    &dx::HeapDesc::new(size * 2, dx::HeapProperties::default())
-                        .with_flags(dx::HeapFlags::SharedCrossAdapter | dx::HeapFlags::Shared),
-                )
-                .expect("Failed to create shared heap");
 
             let cross_res = self
                 .gpu
