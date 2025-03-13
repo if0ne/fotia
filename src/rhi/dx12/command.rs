@@ -150,7 +150,8 @@ pub struct DxCommandQueue {
     pub(crate) queue: Mutex<dx::CommandQueue>,
 }
 
-impl RenderCommandQueue<DxDevice> for DxCommandQueue {
+impl RenderCommandQueue for DxCommandQueue {
+    type Device = DxDevice;
     type Event = DxFence;
     type CommandBuffer = DxCommandBuffer;
 
@@ -290,7 +291,8 @@ pub struct DxResourceUploader {
     res_pool: Mutex<Vec<Vec<DxBuffer>>>,
 }
 
-impl RenderCommandQueue<DxDevice> for DxResourceUploader {
+impl RenderCommandQueue for DxResourceUploader {
+    type Device = DxDevice;
     type Event = DxFence;
     type CommandBuffer = DxIoCommandBuffer;
 
@@ -367,7 +369,7 @@ impl RenderCommandQueue<DxDevice> for DxResourceUploader {
     }
 }
 
-impl RenderResourceUploader<DxDevice> for DxResourceUploader {}
+impl RenderResourceUploader for DxResourceUploader {}
 
 #[derive(Debug)]
 pub struct DxIoCommandBuffer {

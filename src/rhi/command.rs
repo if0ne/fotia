@@ -3,8 +3,8 @@ use super::resources::RenderResourceDevice;
 pub type SyncPoint = u64;
 
 pub trait RenderCommandDevice: RenderResourceDevice {
-    type ResourceUploader: RenderResourceUploader<Self, CommandBuffer: IoCommandBuffer<Device = Self>>;
-    type CommandQueue: RenderCommandQueue<Self>;
+    type ResourceUploader: RenderResourceUploader<Device = Self, CommandBuffer: IoCommandBuffer<Device = Self>>;
+    type CommandQueue: RenderCommandQueue<Device = Self>;
     type Event;
 
     fn create_command_queue(&self, ty: CommandType, capacity: Option<usize>) -> Self::CommandQueue;
@@ -16,14 +16,15 @@ pub trait RenderCommandDevice: RenderResourceDevice {
     fn wait_idle(&self);
 }
 
-pub trait RenderCommandQueue<D> {
+pub trait RenderCommandQueue {
+    type Device;
     type Event;
     type CommandBuffer;
 
     fn create_command_buffer(&self) -> Self::CommandBuffer;
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer);
     fn commit(&self, cmd_buffer: Self::CommandBuffer);
-    fn submit(&self, device: &D) -> SyncPoint;
+    fn submit(&self, device: &Self::Device) -> SyncPoint;
 
     fn signal_event(&self, event: &Self::Event) -> SyncPoint;
     fn wait_event(&self, event: &Self::Event);
@@ -33,7 +34,7 @@ pub trait RenderCommandQueue<D> {
     fn wait_idle(&self);
 }
 
-pub trait RenderResourceUploader<D>: RenderCommandQueue<D, CommandBuffer: IoCommandBuffer> {}
+pub trait RenderResourceUploader: RenderCommandQueue<CommandBuffer: IoCommandBuffer> {}
 
 pub trait IoCommandBuffer {
     type Device: RenderResourceDevice;
