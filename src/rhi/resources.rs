@@ -1,11 +1,11 @@
-use std::{borrow::Cow, ops::Range};
+use std::{borrow::Cow, fmt::Debug, ops::Range};
 
 use super::types::{AddressMode, Filter, Format};
 
 pub trait RenderResourceDevice: Sized {
-    type Buffer;
-    type Texture;
-    type Sampler;
+    type Buffer: Debug;
+    type Texture: Debug;
+    type Sampler: Debug;
 
     fn create_buffer(&self, desc: BufferDesc) -> Self::Buffer;
     fn destroy_buffer(&self, buffer: Self::Buffer);

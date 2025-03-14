@@ -5,10 +5,11 @@ use crate::{
     rhi::{
         command::{IoCommandBuffer, RenderCommandDevice, RenderCommandQueue},
         resources::{BufferDesc, RenderResourceDevice, SamplerDesc, TextureDesc, TextureViewDesc},
+        shader::RenderShaderDevice,
     },
 };
 
-use super::context::Context;
+use super::{context::Context, shader::PipelineLayout};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Buffer;
@@ -22,7 +23,6 @@ pub struct Sampler;
 pub trait RenderResourceContext {
     // Resources
     fn bind_buffer(&self, handle: Handle<Buffer>, desc: BufferDesc, init_data: Option<&[u8]>);
-
     fn unbind_buffer(&self, handle: Handle<Buffer>);
 
     fn bind_texture(&self, handle: Handle<Texture>, desc: TextureDesc, init_data: Option<&[u8]>);
@@ -41,7 +41,9 @@ pub trait RenderResourceContext {
     fn unbind_sampler(&self, handle: Handle<Sampler>);
 }
 
-impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Context<D> {
+impl<D: RenderResourceDevice + RenderCommandDevice + RenderShaderDevice> RenderResourceContext
+    for Context<D>
+{
     fn bind_buffer(&self, handle: Handle<Buffer>, desc: BufferDesc, init_data: Option<&[u8]>) {
         let buffer = self.gpu.create_buffer(desc);
 
@@ -118,13 +120,13 @@ impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Co
     fn bind_sampler(&self, handle: Handle<Sampler>, desc: SamplerDesc) {
         let sampler = self.gpu.create_sampler(desc);
 
-        if let Some(sampler) = self.mapper.sampler.lock().set(handle, sampler) {
+        if let Some(sampler) = self.mapper.samplers.lock().set(handle, sampler) {
             self.gpu.destroy_sampler(sampler);
         }
     }
 
     fn unbind_sampler(&self, handle: Handle<Sampler>) {
-        let Some(sampler) = self.mapper.sampler.lock().remove(handle) else {
+        let Some(sampler) = self.mapper.samplers.lock().remove(handle) else {
             return;
         };
 
@@ -132,18 +134,21 @@ impl<D: RenderResourceDevice + RenderCommandDevice> RenderResourceContext for Co
     }
 }
 
-pub(super) struct ResourceMapper<D: RenderResourceDevice> {
+pub(super) struct ResourceMapper<D: RenderResourceDevice + RenderShaderDevice> {
     pub(super) buffers: Mutex<SparseArray<Buffer, D::Buffer>>,
     pub(super) textures: Mutex<SparseArray<Texture, D::Texture>>,
-    pub(super) sampler: Mutex<SparseArray<Sampler, D::Sampler>>,
+    pub(super) samplers: Mutex<SparseArray<Sampler, D::Sampler>>,
+
+    pub(super) pipeline_layouts: Mutex<SparseArray<PipelineLayout, D::PipelineLayout>>,
 }
 
-impl<D: RenderResourceDevice> Default for ResourceMapper<D> {
+impl<D: RenderResourceDevice + RenderShaderDevice> Default for ResourceMapper<D> {
     fn default() -> Self {
         Self {
             buffers: Mutex::new(SparseArray::new(128)),
             textures: Mutex::new(SparseArray::new(128)),
-            sampler: Mutex::new(SparseArray::new(128)),
+            samplers: Mutex::new(SparseArray::new(128)),
+            pipeline_layouts: Mutex::new(SparseArray::new(128)),
         }
     }
 }

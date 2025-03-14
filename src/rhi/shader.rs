@@ -45,10 +45,16 @@ pub struct BindingEntry {
     pub nums: u32,
 }
 
+impl BindingEntry {
+    pub fn new(ty: BindingType, nums: u32) -> Self {
+        Self { ty, nums }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BindingSet<'a> {
     pub entries: &'a [BindingEntry],
-    pub space: u32,
+    pub use_dynamic_buffer: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -63,10 +69,17 @@ pub struct PipelineLayoutDesc<'a> {
     pub static_samplers: &'a [StaticSampler],
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ShaderArgument<'a, D: RenderResourceDevice> {
+    Cbv(&'a D::Buffer, usize),
+    Srv(&'a D::Texture),
+    Uav(&'a D::Texture),
+    Sample(&'a D::Sampler),
+}
+
+#[derive(Clone, Debug)]
 pub struct ShaderArgumentDesc<'a, 'b, D: RenderResourceDevice> {
-    pub textures: &'a [&'b D::Texture],
-    pub samplers: &'a [&'b D::Sampler],
+    pub arguments: &'a [ShaderArgument<'b, D>],
     pub dynamic_buffer: Option<&'b D::Buffer>,
 }
 

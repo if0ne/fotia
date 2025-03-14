@@ -2,7 +2,7 @@ use crate::rhi::{
     backend::{Api, RenderDeviceId, RenderDeviceInfo},
     command::RenderCommandDevice,
     resources::RenderResourceDevice,
-    shader::{CompiledShader, ShaderDesc},
+    shader::{CompiledShader, RenderShaderDevice, ShaderDesc},
 };
 
 use super::context::Context;
@@ -18,7 +18,9 @@ impl<A: Api> Backend<A> {
     }
 }
 
-impl<A: Api<Device: RenderCommandDevice + RenderResourceDevice>> Api for Backend<A> {
+impl<A: Api<Device: RenderCommandDevice + RenderResourceDevice + RenderShaderDevice>> Api
+    for Backend<A>
+{
     type Device = Context<A::Device>;
 
     fn enumerate_devices(&self) -> impl Iterator<Item = &RenderDeviceInfo> + '_ {

@@ -2,13 +2,18 @@ use parking_lot::Mutex;
 
 use crate::collections::handle::{Handle, HandleAllocator};
 
-use super::resources::{Buffer, Sampler, Texture};
+use super::{
+    resources::{Buffer, Sampler, Texture},
+    shader::PipelineLayout,
+};
 
 #[derive(Debug)]
 pub struct HandleContainer {
     pub(super) buffers: Mutex<HandleAllocator<Buffer>>,
     pub(super) textures: Mutex<HandleAllocator<Texture>>,
-    pub(super) sampler: Mutex<HandleAllocator<Sampler>>,
+    pub(super) samplers: Mutex<HandleAllocator<Sampler>>,
+
+    pub(super) pipeline_layouts: Mutex<HandleAllocator<PipelineLayout>>,
 }
 
 impl HandleContainer {
@@ -16,7 +21,8 @@ impl HandleContainer {
         Self {
             buffers: Mutex::new(HandleAllocator::new()),
             textures: Mutex::new(HandleAllocator::new()),
-            sampler: Mutex::new(HandleAllocator::new()),
+            samplers: Mutex::new(HandleAllocator::new()),
+            pipeline_layouts: Mutex::new(HandleAllocator::new()),
         }
     }
 
@@ -42,11 +48,21 @@ impl HandleContainer {
 
     #[inline]
     pub(super) fn create_sampler_handle(&self) -> Handle<Sampler> {
-        self.sampler.lock().allocate()
+        self.samplers.lock().allocate()
     }
 
     #[inline]
     pub(super) fn free_sampler_handle(&self, handle: Handle<Sampler>) {
-        self.sampler.lock().free(handle);
+        self.samplers.lock().free(handle);
+    }
+
+    #[inline]
+    pub(super) fn create_pipeline_layout(&self) -> Handle<PipelineLayout> {
+        self.pipeline_layouts.lock().allocate()
+    }
+
+    #[inline]
+    pub(super) fn free_pipeline_layout(&self, handle: Handle<PipelineLayout>) {
+        self.pipeline_layouts.lock().free(handle);
     }
 }

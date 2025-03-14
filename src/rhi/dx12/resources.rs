@@ -19,7 +19,7 @@ use super::{
 impl RenderResourceDevice for DxDevice {
     type Buffer = DxBuffer;
     type Texture = DxTexture;
-    type Sampler = ();
+    type Sampler = DxSampler;
 
     fn create_buffer(&self, desc: BufferDesc) -> Self::Buffer {
         let heap_props = match desc.memory_location {
@@ -179,7 +179,7 @@ impl RenderResourceDevice for DxDevice {
     }
 
     fn create_sampler(&self, desc: SamplerDesc) -> Self::Sampler {
-        todo!()
+        DxSampler { desc }
     }
 
     fn destroy_sampler(&self, _sampler: Self::Sampler) {}
@@ -695,4 +695,9 @@ impl DxDevice {
             }
         }
     }
+}
+
+#[derive(Debug)]
+pub struct DxSampler {
+    pub(super) desc: SamplerDesc,
 }

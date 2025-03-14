@@ -9,6 +9,7 @@ use super::{
     backend::Backend,
     container::HandleContainer,
     resources::{Buffer, Sampler, Texture},
+    shader::PipelineLayout,
 };
 
 #[derive(Debug)]
@@ -64,6 +65,16 @@ impl RenderSystem {
     #[inline]
     pub fn free_sampler_handle(&self, handle: Handle<Sampler>) {
         self.handles.free_sampler_handle(handle)
+    }
+
+    #[inline]
+    pub fn create_pipeline_layout(&self) -> Handle<PipelineLayout> {
+        self.handles.create_pipeline_layout()
+    }
+
+    #[inline]
+    pub fn free_pipeline_layout(&self, handle: Handle<PipelineLayout>) {
+        self.handles.free_pipeline_layout(handle)
     }
 }
 

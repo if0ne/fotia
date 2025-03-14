@@ -1,6 +1,7 @@
 use crate::rhi::{
     command::{RenderCommandDevice, RenderCommandQueue},
     resources::RenderResourceDevice,
+    shader::RenderShaderDevice,
 };
 
 use super::context::Context;
@@ -13,7 +14,9 @@ pub trait RenderCommandContext {
     fn transfer_queue(&self) -> &Self::CommandQueue;
 }
 
-impl<D: RenderCommandDevice + RenderResourceDevice> RenderCommandContext for Context<D> {
+impl<D: RenderCommandDevice + RenderResourceDevice + RenderShaderDevice> RenderCommandContext
+    for Context<D>
+{
     type CommandQueue = D::CommandQueue;
 
     fn graphics_queue(&self) -> &Self::CommandQueue {

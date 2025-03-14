@@ -3,7 +3,8 @@ use oxidx::dx;
 use crate::rhi::{
     command::CommandType,
     resources::{TextureDesc, TextureType, TextureUsages},
-    types::Format,
+    shader::StaticSampler,
+    types::{AddressMode, Filter, Format},
 };
 
 pub(super) fn map_command_buffer_type(ty: CommandType) -> dx::CommandListType {
@@ -86,4 +87,28 @@ pub(super) fn map_texture_flags(
     }
 
     f
+}
+
+pub(super) fn map_static_sampler(sampler: &StaticSampler) -> dx::StaticSamplerDesc {
+    dx::StaticSamplerDesc::default()
+        .with_filter(map_filter(sampler.filter))
+        .with_address_u(map_address_mode(sampler.address_mode))
+        .with_address_v(map_address_mode(sampler.address_mode))
+        .with_address_w(map_address_mode(sampler.address_mode))
+}
+
+pub(super) fn map_filter(filter: Filter) -> dx::Filter {
+    match filter {
+        Filter::Point => dx::Filter::Point,
+        Filter::Linear => dx::Filter::Linear,
+        Filter::Anisotropic => dx::Filter::Anisotropic,
+    }
+}
+
+pub(super) fn map_address_mode(mode: AddressMode) -> dx::AddressMode {
+    match mode {
+        AddressMode::Wrap => dx::AddressMode::Wrap,
+        AddressMode::Mirror => dx::AddressMode::Mirror,
+        AddressMode::Clamp => dx::AddressMode::Clamp,
+    }
 }

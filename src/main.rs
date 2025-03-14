@@ -1,11 +1,13 @@
 use ra::{
     context::ContextDual,
     resources::RenderResourceContext,
+    shader::RenderShaderContext,
     system::{RenderBackend, RenderBackendSettings, RenderSystem},
 };
 use rhi::{
     backend::{Api, DebugFlags},
     resources::TextureUsages,
+    shader::{BindingEntry, BindingSet, BindingType},
     types::Format,
 };
 use tracing_subscriber::layer::SubscriberExt;
@@ -52,5 +54,37 @@ fn main() {
         );
 
         ctx.unbind_texture(texture);
+    });
+
+    let layout = rs.create_pipeline_layout();
+
+    group.call_primary(|ctx| {
+        ctx.bind_pipeline_layout(
+            layout,
+            rhi::shader::PipelineLayoutDesc {
+                sets: &[
+                    BindingSet {
+                        entries: &[BindingEntry::new(BindingType::Sampler, 1)],
+                        use_dynamic_buffer: false,
+                    },
+                    BindingSet {
+                        entries: &[
+                            BindingEntry::new(BindingType::Srv, 1),
+                            BindingEntry::new(BindingType::Srv, 1),
+                            BindingEntry::new(BindingType::Srv, 1),
+                            BindingEntry::new(BindingType::Cbv, 1),
+                        ],
+                        use_dynamic_buffer: false,
+                    },
+                    BindingSet {
+                        entries: &[],
+                        use_dynamic_buffer: true,
+                    },
+                ],
+                static_samplers: &[],
+            },
+        );
+
+        ctx.unbind_pipeline_layout(layout);
     });
 }

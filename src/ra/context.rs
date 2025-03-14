@@ -1,11 +1,12 @@
 use crate::rhi::{
     command::{CommandType, RenderCommandDevice, RenderCommandQueue},
     resources::RenderResourceDevice,
+    shader::RenderShaderDevice,
 };
 
 use super::resources::ResourceMapper;
 
-pub struct Context<D: RenderResourceDevice + RenderCommandDevice> {
+pub struct Context<D: RenderResourceDevice + RenderCommandDevice + RenderShaderDevice> {
     pub(super) gpu: D,
 
     pub(super) graphics_queue: D::CommandQueue,
@@ -17,7 +18,7 @@ pub struct Context<D: RenderResourceDevice + RenderCommandDevice> {
     pub(super) mapper: ResourceMapper<D>,
 }
 
-impl<D: RenderResourceDevice + RenderCommandDevice> Context<D> {
+impl<D: RenderResourceDevice + RenderCommandDevice + RenderShaderDevice> Context<D> {
     pub fn new(gpu: D) -> Self {
         let graphics_queue = gpu.create_command_queue(CommandType::Graphics, None);
         let compute_queue = gpu.create_command_queue(CommandType::Compute, None);
@@ -43,12 +44,12 @@ impl<D: RenderResourceDevice + RenderCommandDevice> Context<D> {
     }
 }
 
-pub struct ContextDual<D: RenderResourceDevice + RenderCommandDevice> {
+pub struct ContextDual<D: RenderResourceDevice + RenderCommandDevice + RenderShaderDevice> {
     pub primary: Context<D>,
     pub secondary: Context<D>,
 }
 
-impl<D: RenderResourceDevice + RenderCommandDevice> ContextDual<D> {
+impl<D: RenderResourceDevice + RenderCommandDevice + RenderShaderDevice> ContextDual<D> {
     pub fn new(primary: Context<D>, secondary: Context<D>) -> Self {
         Self { primary, secondary }
     }

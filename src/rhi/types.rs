@@ -26,7 +26,7 @@ impl Format {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Filter {
     #[default]
     Point,
@@ -34,7 +34,7 @@ pub enum Filter {
     Anisotropic,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum AddressMode {
     #[default]
     Wrap,
