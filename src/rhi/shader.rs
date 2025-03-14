@@ -42,7 +42,6 @@ pub enum BindingType {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BindingEntry {
     pub ty: BindingType,
-    pub slot: u32,
     pub nums: u32,
 }
 
@@ -54,7 +53,6 @@ pub struct BindingSet<'a> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StaticSampler {
-    pub slot: u32,
     pub filter: Filter,
     pub address_mode: AddressMode,
 }
@@ -66,16 +64,10 @@ pub struct PipelineLayoutDesc<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Binding<T> {
-    pub binding: T,
-    pub slot: u32,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ShaderArgumentDesc<'a, 'b, D: RenderResourceDevice> {
-    pub textures: &'a [&'b Binding<D::Texture>],
-    pub samplers: &'a [&'b Binding<D::Sampler>],
-    pub dynamic_buffer: Option<&'b Binding<D::Buffer>>,
+    pub textures: &'a [&'b D::Texture],
+    pub samplers: &'a [&'b D::Sampler],
+    pub dynamic_buffer: Option<&'b D::Buffer>,
 }
 
 #[derive(Clone, Debug, Eq)]
