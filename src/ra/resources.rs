@@ -9,7 +9,10 @@ use crate::{
     },
 };
 
-use super::{context::Context, shader::PipelineLayout};
+use super::{
+    context::Context,
+    shader::{PipelineLayout, RasterPipeline},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Buffer;
@@ -140,6 +143,7 @@ pub(super) struct ResourceMapper<D: RenderResourceDevice + RenderShaderDevice> {
     pub(super) samplers: Mutex<SparseArray<Sampler, D::Sampler>>,
 
     pub(super) pipeline_layouts: Mutex<SparseArray<PipelineLayout, D::PipelineLayout>>,
+    pub(super) raster_pipelines: Mutex<SparseArray<RasterPipeline, D::RasterPipeline>>,
 }
 
 impl<D: RenderResourceDevice + RenderShaderDevice> Default for ResourceMapper<D> {
@@ -149,6 +153,7 @@ impl<D: RenderResourceDevice + RenderShaderDevice> Default for ResourceMapper<D>
             textures: Mutex::new(SparseArray::new(128)),
             samplers: Mutex::new(SparseArray::new(128)),
             pipeline_layouts: Mutex::new(SparseArray::new(128)),
+            raster_pipelines: Mutex::new(SparseArray::new(128)),
         }
     }
 }

@@ -1,5 +1,7 @@
+use std::ffi::CString;
+
 use oxidx::dx::{
-    self, IAdapter3, IDebug, IDebug1, IDebugExt, IDevice, IFactory4, IFactory6,
+    self, IAdapter3, IBlob, IBlobExt, IDebug, IDebug1, IDebugExt, IDevice, IFactory4, IFactory6,
     features::{Architecture1Feature, OptionsFeature},
 };
 use tracing::{debug, error, info, warn};
@@ -7,6 +9,7 @@ use tracing::{debug, error, info, warn};
 use crate::rhi::{
     backend::{Api, DebugFlags, DeviceType, RenderDeviceId, RenderDeviceInfo},
     shader::{CompiledShader, ShaderDesc},
+    types::ShaderType,
 };
 
 use super::device::DxDevice;
@@ -193,6 +196,46 @@ impl Api for DxBackend {
     }
 
     fn compile_shader(&self, desc: ShaderDesc) -> CompiledShader {
-        todo!()
+        let target = match desc.ty {
+            ShaderType::Vertex => c"vs_5_1",
+            ShaderType::Pixel => c"ps_5_1",
+        };
+
+        let flags = if desc.debug {
+            dx::COMPILE_DEBUG | dx::COMPILE_SKIP_OPT
+        } else {
+            0
+        };
+
+        let defines = desc
+            .defines
+            .iter()
+            .map(|(k, v)| {
+                (
+                    CString::new(k.as_bytes()).expect("CString::new failed"),
+                    CString::new(v.as_bytes()).expect("CString::new failed"),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let defines = defines
+            .iter()
+            .map(|(k, v)| dx::ShaderMacro::new(k, v))
+            .chain(std::iter::once(dx::ShaderMacro::default()))
+            .collect::<Vec<_>>();
+
+        let entry_point = CString::new(desc.entry_point.as_bytes()).expect("CString::new failed");
+
+        let raw = dx::Blob::compile_from_file(&desc.path, &defines, &entry_point, target, flags, 0)
+            .expect("Failed to compile a shader");
+
+        let mapped = raw.get_buffer_ptr::<u8>();
+
+        let slice = unsafe { std::slice::from_raw_parts(mapped.as_ptr(), raw.get_buffer_size()) };
+
+        let mut raw = vec![0; raw.get_buffer_size()];
+        raw.clone_from_slice(slice);
+
+        CompiledShader { raw, desc }
     }
 }

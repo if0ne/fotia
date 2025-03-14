@@ -123,7 +123,7 @@ impl PartialEq for ShaderDesc {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RasterPipelineDesc<'a, D: RenderShaderDevice> {
-    pub layout: Option<D::PipelineLayout>,
+    pub layout: Option<&'a D::PipelineLayout>,
     pub input_elements: &'a [InputElementDesc],
     pub depth_bias: i32,
     pub slope_bias: f32,

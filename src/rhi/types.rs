@@ -64,26 +64,26 @@ pub enum ShaderType {
     Pixel,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum VertexFormat {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum VertexType {
     Float,
     Float2,
     Float3,
     Float4,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum VertexAttribute {
     Position(u8),
     Color(u8),
-    Normal,
-    Tangent,
+    Normal(u8),
+    Tangent(u8),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct InputElementDesc {
     pub semantic: VertexAttribute,
-    pub format: VertexFormat,
+    pub format: VertexType,
     pub slot: u32,
 }
 

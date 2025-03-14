@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use ra::{
     context::ContextDual,
     resources::RenderResourceContext,
@@ -7,8 +9,8 @@ use ra::{
 use rhi::{
     backend::{Api, DebugFlags},
     resources::TextureUsages,
-    shader::{BindingEntry, BindingSet, BindingType},
-    types::Format,
+    shader::BindingSet,
+    types::{CullMode, Format, InputElementDesc, ShaderType, VertexAttribute, VertexType},
 };
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -56,35 +58,50 @@ fn main() {
         ctx.unbind_texture(texture);
     });
 
-    let layout = rs.create_pipeline_layout();
+    let layout = rs.create_pipeline_layout_handle();
+    let pipeline = rs.create_raster_pipeline_handle();
+
+    let vs = backend.compile_shader(rhi::shader::ShaderDesc {
+        ty: ShaderType::Vertex,
+        path: PathBuf::from("../assets/test.hlsl"),
+        entry_point: "Main".to_string(),
+        debug: true,
+        defines: vec![],
+    });
 
     group.call_primary(|ctx| {
         ctx.bind_pipeline_layout(
             layout,
             rhi::shader::PipelineLayoutDesc {
-                sets: &[
-                    BindingSet {
-                        entries: &[BindingEntry::new(BindingType::Sampler, 1)],
-                        use_dynamic_buffer: false,
-                    },
-                    BindingSet {
-                        entries: &[
-                            BindingEntry::new(BindingType::Srv, 1),
-                            BindingEntry::new(BindingType::Srv, 1),
-                            BindingEntry::new(BindingType::Srv, 1),
-                            BindingEntry::new(BindingType::Cbv, 1),
-                        ],
-                        use_dynamic_buffer: false,
-                    },
-                    BindingSet {
-                        entries: &[],
-                        use_dynamic_buffer: true,
-                    },
-                ],
+                sets: &[BindingSet {
+                    entries: &[],
+                    use_dynamic_buffer: true,
+                }],
                 static_samplers: &[],
             },
         );
 
+        ctx.bind_raster_pipeline(
+            pipeline,
+            ra::shader::RasterPipelineDesc {
+                layout: Some(layout),
+                input_elements: &[InputElementDesc {
+                    semantic: VertexAttribute::Position(0),
+                    format: VertexType::Float3,
+                    slot: 0,
+                }],
+                depth_bias: 0,
+                slope_bias: 0.0,
+                depth_clip: false,
+                depth: None,
+                render_targets: &[Format::Rgba8],
+                cull_mode: CullMode::None,
+                vs: &vs,
+                shaders: &[],
+            },
+        );
+
         ctx.unbind_pipeline_layout(layout);
+        ctx.unbind_raster_pipeline(pipeline);
     });
 }

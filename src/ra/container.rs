@@ -4,7 +4,7 @@ use crate::collections::handle::{Handle, HandleAllocator};
 
 use super::{
     resources::{Buffer, Sampler, Texture},
-    shader::PipelineLayout,
+    shader::{PipelineLayout, RasterPipeline},
 };
 
 #[derive(Debug)]
@@ -14,6 +14,7 @@ pub struct HandleContainer {
     pub(super) samplers: Mutex<HandleAllocator<Sampler>>,
 
     pub(super) pipeline_layouts: Mutex<HandleAllocator<PipelineLayout>>,
+    pub(super) raster_pipeline: Mutex<HandleAllocator<RasterPipeline>>,
 }
 
 impl HandleContainer {
@@ -23,6 +24,7 @@ impl HandleContainer {
             textures: Mutex::new(HandleAllocator::new()),
             samplers: Mutex::new(HandleAllocator::new()),
             pipeline_layouts: Mutex::new(HandleAllocator::new()),
+            raster_pipeline: Mutex::new(HandleAllocator::new()),
         }
     }
 
@@ -57,12 +59,22 @@ impl HandleContainer {
     }
 
     #[inline]
-    pub(super) fn create_pipeline_layout(&self) -> Handle<PipelineLayout> {
+    pub(super) fn create_pipeline_layout_handle(&self) -> Handle<PipelineLayout> {
         self.pipeline_layouts.lock().allocate()
     }
 
     #[inline]
-    pub(super) fn free_pipeline_layout(&self, handle: Handle<PipelineLayout>) {
+    pub(super) fn free_pipeline_layout_handle(&self, handle: Handle<PipelineLayout>) {
         self.pipeline_layouts.lock().free(handle);
+    }
+
+    #[inline]
+    pub(super) fn create_raster_pipeline_handle(&self) -> Handle<RasterPipeline> {
+        self.raster_pipeline.lock().allocate()
+    }
+
+    #[inline]
+    pub(super) fn free_raster_pipeline_handle(&self, handle: Handle<RasterPipeline>) {
+        self.raster_pipeline.lock().free(handle);
     }
 }

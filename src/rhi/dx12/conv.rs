@@ -4,7 +4,7 @@ use crate::rhi::{
     command::CommandType,
     resources::{TextureDesc, TextureType, TextureUsages},
     shader::StaticSampler,
-    types::{AddressMode, Filter, Format},
+    types::{AddressMode, CullMode, DepthOp, Filter, Format, VertexAttribute, VertexType},
 };
 
 pub(super) fn map_command_buffer_type(ty: CommandType) -> dx::CommandListType {
@@ -110,5 +110,41 @@ pub(super) fn map_address_mode(mode: AddressMode) -> dx::AddressMode {
         AddressMode::Wrap => dx::AddressMode::Wrap,
         AddressMode::Mirror => dx::AddressMode::Mirror,
         AddressMode::Clamp => dx::AddressMode::Clamp,
+    }
+}
+
+pub(super) fn map_semantic(semantic: VertexAttribute) -> dx::SemanticName {
+    match semantic {
+        VertexAttribute::Position(n) => dx::SemanticName::Position(n),
+        VertexAttribute::Color(n) => dx::SemanticName::Color(n),
+        VertexAttribute::Normal(n) => dx::SemanticName::Normal(n),
+        VertexAttribute::Tangent(n) => dx::SemanticName::Tangent(n),
+    }
+}
+
+pub(super) fn map_vertex_format(format: VertexType) -> dx::Format {
+    match format {
+        VertexType::Float => dx::Format::R32Float,
+        VertexType::Float2 => dx::Format::Rg32Float,
+        VertexType::Float3 => dx::Format::Rgb32Float,
+        VertexType::Float4 => dx::Format::Rgba32Float,
+    }
+}
+
+pub(super) fn map_cull_mode(mode: CullMode) -> dx::CullMode {
+    match mode {
+        CullMode::None => dx::CullMode::None,
+        CullMode::Back => dx::CullMode::Back,
+        CullMode::Front => dx::CullMode::Front,
+    }
+}
+
+pub(super) fn map_depth_op(op: DepthOp) -> dx::ComparisonFunc {
+    match op {
+        DepthOp::None => dx::ComparisonFunc::None,
+        DepthOp::Less => dx::ComparisonFunc::Less,
+        DepthOp::Equal => dx::ComparisonFunc::Equal,
+        DepthOp::LessEqual => dx::ComparisonFunc::LessEqual,
+        DepthOp::Greater => dx::ComparisonFunc::Greater,
     }
 }

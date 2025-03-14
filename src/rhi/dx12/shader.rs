@@ -1,13 +1,17 @@
-use oxidx::dx::{self, IDevice};
+use oxidx::dx::{self, IBlobExt, IDevice};
 
-use crate::rhi::shader::{BindingType, PipelineLayoutDesc, RasterPipelineDesc, RenderShaderDevice};
+use crate::rhi::{
+    dx12::conv::{map_cull_mode, map_depth_op, map_format, map_semantic, map_vertex_format},
+    shader::{BindingType, PipelineLayoutDesc, RasterPipelineDesc, RenderShaderDevice},
+    types::ShaderType,
+};
 
 use super::{conv::map_static_sampler, device::DxDevice};
 
 impl RenderShaderDevice for DxDevice {
     type PipelineLayout = DxPipelineLayout;
     type ShaderArgument = ();
-    type RasterPipeline = ();
+    type RasterPipeline = DxRenderPipeline;
 
     fn create_pipeline_layout(&self, desc: PipelineLayoutDesc<'_>) -> Self::PipelineLayout {
         let mut ranges = vec![];
@@ -100,15 +104,105 @@ impl RenderShaderDevice for DxDevice {
     }
 
     fn create_raster_pipeline(&self, desc: RasterPipelineDesc<'_, Self>) -> Self::RasterPipeline {
-        todo!()
+        let input_element_desc = desc
+            .input_elements
+            .iter()
+            .map(|el| {
+                dx::InputElementDesc::per_vertex(
+                    map_semantic(el.semantic),
+                    map_vertex_format(el.format),
+                    el.slot,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let raster = dx::RasterizerDesc::default()
+            .with_fill_mode(dx::FillMode::Solid)
+            .with_cull_mode(map_cull_mode(desc.cull_mode))
+            .with_depth_bias(desc.depth_bias)
+            .with_slope_scaled_depth_bias(desc.slope_bias);
+
+        let raster = if desc.depth_clip {
+            raster.enable_depth_clip()
+        } else {
+            raster
+        };
+
+        let vs = dx::Blob::from_bytes(&desc.vs.raw).expect("failed to create blob");
+
+        let raw_desc = dx::GraphicsPipelineDesc::new(&vs)
+            .with_input_layout(&input_element_desc)
+            .with_blend_desc(
+                dx::BlendDesc::default().with_render_targets(
+                    desc.render_targets
+                        .iter()
+                        .map(|_| dx::RenderTargetBlendDesc::default()),
+                ),
+            )
+            .with_render_targets(desc.render_targets.iter().map(|f| map_format(*f)))
+            .with_rasterizer_state(raster)
+            .with_primitive_topology(dx::PipelinePrimitiveTopology::Triangle);
+
+        let mut raw_desc = if let Some(depth) = &desc.depth {
+            raw_desc.with_depth_stencil(
+                dx::DepthStencilDesc::default()
+                    .enable_depth(map_depth_op(depth.op))
+                    .with_depth_write_mask(if depth.read_only {
+                        dx::DepthWriteMask::empty()
+                    } else {
+                        dx::DepthWriteMask::All
+                    }),
+                map_format(depth.format),
+            )
+        } else {
+            raw_desc
+        };
+
+        let shaders = desc
+            .shaders
+            .iter()
+            .map(|s| {
+                (
+                    dx::Blob::from_bytes(&s.raw).expect("failed to create blob"),
+                    s.desc.ty,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        for (shader, ty) in shaders.iter() {
+            match ty {
+                ShaderType::Pixel => raw_desc = raw_desc.with_ps(shader),
+                ShaderType::Vertex => unreachable!(),
+            }
+        }
+
+        let raw_desc = if let Some(layout) = &desc.layout {
+            raw_desc.with_root_signature(&layout.raw)
+        } else {
+            raw_desc
+        };
+
+        let raw = self
+            .gpu
+            .create_graphics_pipeline(&raw_desc)
+            .expect("failed to create pipeline");
+
+        DxRenderPipeline {
+            raw,
+            layout: desc.layout.cloned(),
+        }
     }
 
-    fn destroy_raster_pipeline(&self, pipeline: Self::RasterPipeline) {
-        todo!()
-    }
+    fn destroy_raster_pipeline(&self, _pipeline: Self::RasterPipeline) {}
 }
 
 #[derive(Clone, Debug)]
 pub struct DxPipelineLayout {
     pub(super) raw: dx::RootSignature,
+}
+
+#[derive(Clone, Debug)]
+pub struct DxRenderPipeline {
+    pub(super) raw: dx::PipelineState,
+    pub(super) layout: Option<DxPipelineLayout>,
 }

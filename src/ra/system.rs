@@ -9,7 +9,7 @@ use super::{
     backend::Backend,
     container::HandleContainer,
     resources::{Buffer, Sampler, Texture},
-    shader::PipelineLayout,
+    shader::{PipelineLayout, RasterPipeline},
 };
 
 #[derive(Debug)]
@@ -68,13 +68,23 @@ impl RenderSystem {
     }
 
     #[inline]
-    pub fn create_pipeline_layout(&self) -> Handle<PipelineLayout> {
-        self.handles.create_pipeline_layout()
+    pub fn create_pipeline_layout_handle(&self) -> Handle<PipelineLayout> {
+        self.handles.create_pipeline_layout_handle()
     }
 
     #[inline]
-    pub fn free_pipeline_layout(&self, handle: Handle<PipelineLayout>) {
-        self.handles.free_pipeline_layout(handle)
+    pub fn free_pipeline_layout_handle(&self, handle: Handle<PipelineLayout>) {
+        self.handles.free_pipeline_layout_handle(handle)
+    }
+
+    #[inline]
+    pub fn create_raster_pipeline_handle(&self) -> Handle<RasterPipeline> {
+        self.handles.create_raster_pipeline_handle()
+    }
+
+    #[inline]
+    pub fn free_raster_pipeline_handle(&self, handle: Handle<RasterPipeline>) {
+        self.handles.free_raster_pipeline_handle(handle)
     }
 }
 
