@@ -91,13 +91,13 @@ pub trait GpuEvent {
 
 pub trait RenderEncoder {
     type Buffer;
-    type RenderPipeline;
+    type RasterPipeline;
     type ShaderArgument;
 
     fn set_viewport(&mut self, viewport: Viewport);
     fn set_scissor(&mut self, scissor: Scissor);
 
-    fn set_render_pipeline(&mut self, pipeline: &Self::RenderPipeline);
+    fn set_raster_pipeline(&mut self, pipeline: &Self::RasterPipeline);
     fn bind_shader_argument(&mut self, argument: &Self::ShaderArgument, dynamic_offset: u64);
 
     fn bind_vertex_buffer(&mut self, buffer: &Self::Buffer, slot: usize);

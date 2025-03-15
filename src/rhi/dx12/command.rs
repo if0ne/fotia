@@ -22,7 +22,7 @@ use super::{
     conv::map_command_buffer_type,
     device::DxDevice,
     resources::{DxBuffer, DxTexture},
-    shader::{DxRenderPipeline, DxShaderArgument},
+    shader::{DxRasterPipeline, DxShaderArgument},
 };
 
 impl RenderCommandDevice for DxDevice {
@@ -517,7 +517,7 @@ pub struct DxRenderEncoder<'a> {
 
 impl<'a> RenderEncoder for DxRenderEncoder<'a> {
     type Buffer = DxBuffer;
-    type RenderPipeline = DxRenderPipeline;
+    type RasterPipeline = DxRasterPipeline;
     type ShaderArgument = DxShaderArgument;
 
     fn set_viewport(&mut self, viewport: Viewport) {
@@ -536,7 +536,7 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
             .with_size((scissor.w as i32, scissor.h as i32))]);
     }
 
-    fn set_render_pipeline(&mut self, pipeline: &Self::RenderPipeline) {
+    fn set_raster_pipeline(&mut self, pipeline: &Self::RasterPipeline) {
         self.cmd.list.set_pipeline_state(&pipeline.raw);
 
         if let Some(layout) = &pipeline.layout {

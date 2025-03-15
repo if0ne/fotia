@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use ra::{
+    command::{RenderCommandContext, RenderCommandEncoder, RenderEncoder},
     context::ContextDual,
     resources::RenderResourceContext,
     shader::{RenderShaderContext, ShaderArgumentDesc, ShaderEntry},
@@ -176,5 +177,10 @@ fn main() {
                 dynamic_buffer: None,
             },
         );
+
+        let mut cmd = ctx.create_encoder(rhi::command::CommandType::Graphics);
+
+        let mut encoder = cmd.render(&[diffuse, normal, material], None);
+        encoder.draw(3, 0);
     });
 }

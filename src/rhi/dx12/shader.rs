@@ -17,7 +17,7 @@ use super::{
 impl RenderShaderDevice for DxDevice {
     type PipelineLayout = DxPipelineLayout;
     type ShaderArgument = DxShaderArgument;
-    type RasterPipeline = DxRenderPipeline;
+    type RasterPipeline = DxRasterPipeline;
 
     fn create_pipeline_layout(&self, desc: PipelineLayoutDesc<'_>) -> Self::PipelineLayout {
         let mut ranges = vec![];
@@ -256,7 +256,7 @@ impl RenderShaderDevice for DxDevice {
             .create_graphics_pipeline(&raw_desc)
             .expect("failed to create pipeline");
 
-        DxRenderPipeline {
+        DxRasterPipeline {
             raw,
             layout: desc.layout.cloned(),
         }
@@ -271,7 +271,7 @@ pub struct DxPipelineLayout {
 }
 
 #[derive(Debug)]
-pub struct DxRenderPipeline {
+pub struct DxRasterPipeline {
     pub(super) raw: dx::PipelineState,
     pub(super) layout: Option<DxPipelineLayout>,
 }
