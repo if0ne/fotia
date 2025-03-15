@@ -8,7 +8,7 @@ use crate::rhi::backend::RenderDeviceInfo;
 
 #[derive(Debug)]
 pub struct DxDevice {
-    adapter: dx::Adapter3,
+    _adapter: dx::Adapter3,
 
     pub(super) factory: dx::Factory4,
     pub(super) gpu: dx::Device,
@@ -40,7 +40,7 @@ impl DxDevice {
 
         Self {
             gpu: device,
-            adapter,
+            _adapter: adapter,
             factory,
             desc,
             descriptors,
@@ -94,7 +94,7 @@ impl DescriptorPool {
 #[derive(Debug)]
 pub(super) struct DescriptorHeap {
     ty: dx::DescriptorHeapType,
-    size: usize,
+    _size: usize,
     shader_visible: bool,
     allocator: range_alloc::RangeAllocator<usize>,
 
@@ -122,7 +122,7 @@ impl DescriptorHeap {
         Self {
             heap,
             ty,
-            size,
+            _size: size,
             inc_size,
             shader_visible,
             allocator,

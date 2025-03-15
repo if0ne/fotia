@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use crate::rhi::{
     command::{
@@ -6,9 +6,13 @@ use crate::rhi::{
     },
     resources::RenderResourceDevice,
     shader::RenderShaderDevice,
+    swapchain::RenderSwapchainDevice,
 };
 
-use super::{command::CommandQueue, resources::ResourceMapper};
+use super::{
+    command::CommandQueue, container::HandleContainer, resources::ResourceMapper,
+    system::RenderSystem,
+};
 
 pub trait RenderDevice:
     RenderResourceDevice
@@ -24,6 +28,7 @@ pub trait RenderDevice:
             >,
         >,
     > + RenderShaderDevice
+    + RenderSwapchainDevice
 {
 }
 
@@ -41,6 +46,7 @@ impl<T> RenderDevice for T where
                 >,
             >,
         > + RenderShaderDevice
+        + RenderSwapchainDevice
 {
 }
 

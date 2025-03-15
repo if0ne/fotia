@@ -141,7 +141,7 @@ impl RenderResourceDevice for DxDevice {
             size: texture.size,
             descriptor,
             view: desc,
-            is_view: true,
+            _is_view: true,
         }
     }
 
@@ -235,7 +235,7 @@ pub struct DxTexture {
 
     pub(super) descriptor: Option<Descriptor>,
     pub(super) view: TextureViewDesc,
-    pub(super) is_view: bool,
+    pub(super) _is_view: bool,
 }
 
 #[derive(Debug)]
@@ -303,7 +303,7 @@ impl DxDevice {
             size,
             descriptor,
             view,
-            is_view: false,
+            _is_view: false,
         }
     }
 
@@ -356,7 +356,7 @@ impl DxDevice {
                 size,
                 descriptor,
                 view,
-                is_view: false,
+                _is_view: false,
             }
         } else {
             let raw = self
@@ -422,7 +422,7 @@ impl DxDevice {
                 size,
                 descriptor,
                 view,
-                is_view: false,
+                _is_view: false,
             }
         }
     }

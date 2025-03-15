@@ -1,3 +1,5 @@
+use std::sync::{Arc, Weak};
+
 use crate::rhi::{
     backend::{Api, RenderDeviceId, RenderDeviceInfo},
     shader::{CompiledShader, ShaderDesc},
