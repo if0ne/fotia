@@ -65,7 +65,7 @@ impl RenderCommandDevice for DxDevice {
         DxCommandQueue {
             device: self.gpu.clone(),
             ty_raw: map_command_buffer_type(ty),
-            ty,
+            _ty: ty,
             fence,
             capacity,
             cmd_allocators: Mutex::new(cmd_allocators),
@@ -134,7 +134,7 @@ impl RenderCommandDevice for DxDevice {
 pub struct DxCommandQueue {
     device: dx::Device,
     ty_raw: dx::CommandListType,
-    ty: CommandType,
+    _ty: CommandType,
 
     fence: DxFence,
 
@@ -369,7 +369,15 @@ impl RenderCommandQueue for DxResourceUploader {
     }
 }
 
-impl RenderResourceUploader for DxResourceUploader {}
+impl RenderResourceUploader for DxResourceUploader {
+    fn flush(&self, device: &Self::Device) {
+        self.wait_idle();
+
+        for buffer in self.staging.lock().drain(..) {
+            device.destroy_buffer(buffer.res);
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct DxIoCommandBuffer {

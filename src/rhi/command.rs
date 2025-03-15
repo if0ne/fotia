@@ -34,7 +34,9 @@ pub trait RenderCommandQueue {
     fn wait_idle(&self);
 }
 
-pub trait RenderResourceUploader: RenderCommandQueue<CommandBuffer: IoCommandBuffer> {}
+pub trait RenderResourceUploader: RenderCommandQueue<CommandBuffer: IoCommandBuffer> {
+    fn flush(&self, device: &Self::Device);
+}
 
 pub trait IoCommandBuffer {
     type Device: RenderResourceDevice;
