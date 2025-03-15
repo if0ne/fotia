@@ -93,12 +93,12 @@ impl DescriptorPool {
 
 #[derive(Debug)]
 pub(super) struct DescriptorHeap {
-    heap: dx::DescriptorHeap,
     ty: dx::DescriptorHeapType,
     size: usize,
     shader_visible: bool,
     allocator: range_alloc::RangeAllocator<usize>,
 
+    pub(super) heap: dx::DescriptorHeap,
     pub(super) inc_size: usize,
 }
 

@@ -5,22 +5,24 @@ use std::{
 
 use oxidx::dx::{
     self, ICommandAllocator, ICommandQueue, IDevice, IFence, IGraphicsCommandList,
-    IGraphicsCommandListExt, PSO_NONE,
+    IGraphicsCommandListExt, IResource, PSO_NONE,
 };
 use parking_lot::Mutex;
 
 use crate::rhi::{
     command::{
-        CommandType, GpuEvent, IoCommandBuffer, RenderCommandDevice, RenderCommandQueue,
-        RenderResourceUploader, SyncPoint,
+        CommandType, GpuEvent, IoCommandBuffer, RenderCommandBuffer, RenderCommandDevice,
+        RenderCommandQueue, RenderEncoder, RenderResourceUploader, SyncPoint,
     },
     resources::{BufferDesc, BufferUsages, MemoryLocation, RenderResourceDevice},
+    types::{IndexType, Scissor, Viewport},
 };
 
 use super::{
     conv::map_command_buffer_type,
     device::DxDevice,
     resources::{DxBuffer, DxTexture},
+    shader::{DxRenderPipeline, DxShaderArgument},
 };
 
 impl RenderCommandDevice for DxDevice {
@@ -65,7 +67,7 @@ impl RenderCommandDevice for DxDevice {
         DxCommandQueue {
             device: self.gpu.clone(),
             ty_raw: map_command_buffer_type(ty),
-            _ty: ty,
+            ty,
             fence,
             capacity,
             cmd_allocators: Mutex::new(cmd_allocators),
@@ -134,7 +136,7 @@ impl RenderCommandDevice for DxDevice {
 pub struct DxCommandQueue {
     device: dx::Device,
     ty_raw: dx::CommandListType,
-    _ty: CommandType,
+    ty: CommandType,
 
     fence: DxFence,
 
@@ -204,7 +206,11 @@ impl RenderCommandQueue for DxCommandQueue {
             list
         };
 
-        DxCommandBuffer { list, allocator }
+        DxCommandBuffer {
+            list,
+            allocator,
+            ty: self.ty,
+        }
     }
 
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer) {
@@ -274,7 +280,41 @@ impl RenderCommandQueue for DxCommandQueue {
 #[derive(Debug)]
 pub struct DxCommandBuffer {
     allocator: CommandAllocatorEntry,
+    ty: CommandType,
     pub(super) list: dx::GraphicsCommandList,
+}
+
+impl RenderCommandBuffer for DxCommandBuffer {
+    type Device = DxDevice;
+    type RenderEncoder<'a> = DxRenderEncoder<'a>;
+
+    fn ty(&self) -> CommandType {
+        self.ty
+    }
+
+    fn begin(&mut self, device: &Self::Device) {
+        self.list.set_descriptor_heaps(&[
+            Some(device.descriptors.shader_heap.lock().heap.clone()),
+            Some(device.descriptors.sampler_heap.lock().heap.clone()),
+        ]);
+    }
+
+    fn render(
+        &mut self,
+        targets: &[&DxTexture],
+        depth: Option<&DxTexture>,
+    ) -> Self::RenderEncoder<'_> {
+        let targets = targets
+            .iter()
+            .filter_map(|t| t.descriptor.as_ref().map(|d| d.cpu))
+            .collect::<Vec<_>>();
+
+        let depth = depth.and_then(|t| t.descriptor.as_ref()).map(|d| d.cpu);
+
+        self.list.om_set_render_targets(&targets, false, depth);
+
+        DxRenderEncoder { cmd: self }
+    }
 }
 
 #[derive(Debug)]
@@ -467,5 +507,91 @@ impl GpuEvent for DxFence {
 
     fn get_goal(&self) -> SyncPoint {
         self.value.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+#[derive(Debug)]
+pub struct DxRenderEncoder<'a> {
+    pub(super) cmd: &'a mut DxCommandBuffer,
+}
+
+impl<'a> RenderEncoder for DxRenderEncoder<'a> {
+    type Buffer = DxBuffer;
+    type RenderPipeline = DxRenderPipeline;
+    type ShaderArgument = DxShaderArgument;
+
+    fn set_viewport(&mut self, viewport: Viewport) {
+        self.cmd
+            .list
+            .rs_set_viewports(&[dx::Viewport::from_position_and_size(
+                (viewport.x, viewport.y),
+                (viewport.w, viewport.h),
+            )]);
+    }
+
+    fn set_scissor(&mut self, scissor: Scissor) {
+        self.cmd.list.rs_set_scissor_rects(&[dx::Rect::default()
+            .with_left(scissor.x)
+            .with_top(scissor.y)
+            .with_size((scissor.w as i32, scissor.h as i32))]);
+    }
+
+    fn set_render_pipeline(&mut self, pipeline: &Self::RenderPipeline) {
+        self.cmd.list.set_pipeline_state(&pipeline.raw);
+
+        if let Some(layout) = &pipeline.layout {
+            self.cmd.list.set_graphics_root_signature(Some(&layout.raw));
+        }
+    }
+
+    fn bind_shader_argument(&mut self, argument: &Self::ShaderArgument, dynamic_offset: u64) {
+        if let Some(d) = &argument.views {
+            self.cmd.list.set_graphics_root_descriptor_table(0, d.gpu);
+        }
+
+        if let Some(d) = &argument.samplers {
+            self.cmd.list.set_graphics_root_descriptor_table(0, d.gpu);
+        }
+
+        if let Some(address) = &argument.dynamic_address {
+            self.cmd.list.set_graphics_root_constant_buffer_view(
+                argument.dynamic_index,
+                *address + dynamic_offset,
+            );
+        }
+    }
+
+    fn bind_vertex_buffer(&mut self, buffer: &Self::Buffer, slot: usize) {
+        self.cmd.list.ia_set_vertex_buffers(
+            slot as u32,
+            &[dx::VertexBufferView::new(
+                buffer.raw.get_gpu_virtual_address(),
+                buffer.desc.stride,
+                buffer.desc.size,
+            )],
+        );
+    }
+
+    fn bind_index_buffer(&mut self, buffer: &Self::Buffer, ty: IndexType) {
+        self.cmd
+            .list
+            .ia_set_index_buffer(Some(&dx::IndexBufferView::new(
+                buffer.raw.get_gpu_virtual_address(),
+                buffer.desc.size,
+                match ty {
+                    IndexType::U16 => dx::Format::R16Uint,
+                    IndexType::U32 => dx::Format::R32Uint,
+                },
+            )));
+    }
+
+    fn draw(&mut self, count: u32, start_vertex: u32) {
+        self.cmd.list.draw_instanced(count, 1, start_vertex, 0);
+    }
+
+    fn draw_indexed(&mut self, count: u32, start_index: u32, base_vertex: u32) {
+        self.cmd
+            .list
+            .draw_indexed_instanced(count, 1, start_index, base_vertex as i32, 0);
     }
 }

@@ -93,3 +93,25 @@ pub struct DepthStateDesc {
     pub format: Format,
     pub read_only: bool,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Viewport {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Scissor {
+    pub x: i32,
+    pub y: i32,
+    pub w: u32,
+    pub h: u32,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum IndexType {
+    U16,
+    U32,
+}

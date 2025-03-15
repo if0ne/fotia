@@ -1,10 +1,20 @@
-use super::resources::RenderResourceDevice;
+use super::{
+    resources::RenderResourceDevice,
+    types::{IndexType, Scissor, Viewport},
+};
 
 pub type SyncPoint = u64;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum CommandType {
+    Graphics,
+    Compute,
+    Transfer,
+}
+
 pub trait RenderCommandDevice: RenderResourceDevice {
     type ResourceUploader: RenderResourceUploader<Device = Self, CommandBuffer: IoCommandBuffer<Device = Self>>;
-    type CommandQueue: RenderCommandQueue<Device = Self>;
+    type CommandQueue: RenderCommandQueue<Device = Self, CommandBuffer: RenderCommandBuffer>;
     type Event;
 
     fn create_command_queue(&self, ty: CommandType, capacity: Option<usize>) -> Self::CommandQueue;
@@ -55,13 +65,21 @@ pub trait IoCommandBuffer {
     );
 }
 
-pub trait RenderCommandBuffer {}
+pub trait RenderCommandBuffer {
+    type Device: RenderResourceDevice;
+    type RenderEncoder<'a>
+    where
+        Self: 'a;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CommandType {
-    Graphics,
-    Compute,
-    Transfer,
+    fn ty(&self) -> CommandType;
+
+    fn begin(&mut self, device: &Self::Device);
+
+    fn render(
+        &mut self,
+        targets: &[&<Self::Device as RenderResourceDevice>::Texture],
+        depth: Option<&<Self::Device as RenderResourceDevice>::Texture>,
+    ) -> Self::RenderEncoder<'_>;
 }
 
 pub trait GpuEvent {
@@ -69,4 +87,22 @@ pub trait GpuEvent {
     fn increment(&self) -> SyncPoint;
     fn get_completed_value(&self) -> SyncPoint;
     fn get_goal(&self) -> SyncPoint;
+}
+
+pub trait RenderEncoder {
+    type Buffer;
+    type RenderPipeline;
+    type ShaderArgument;
+
+    fn set_viewport(&mut self, viewport: Viewport);
+    fn set_scissor(&mut self, scissor: Scissor);
+
+    fn set_render_pipeline(&mut self, pipeline: &Self::RenderPipeline);
+    fn bind_shader_argument(&mut self, argument: &Self::ShaderArgument, dynamic_offset: u64);
+
+    fn bind_vertex_buffer(&mut self, buffer: &Self::Buffer, slot: usize);
+    fn bind_index_buffer(&mut self, buffer: &Self::Buffer, ty: IndexType);
+
+    fn draw(&mut self, count: u32, start_vertex: u32);
+    fn draw_indexed(&mut self, count: u32, start_index: u32, base_index: u32);
 }
