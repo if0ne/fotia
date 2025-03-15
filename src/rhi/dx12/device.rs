@@ -96,9 +96,10 @@ pub(super) struct DescriptorHeap {
     heap: dx::DescriptorHeap,
     ty: dx::DescriptorHeapType,
     size: usize,
-    inc_size: usize,
     shader_visible: bool,
     allocator: range_alloc::RangeAllocator<usize>,
+
+    pub(super) inc_size: usize,
 }
 
 impl DescriptorHeap {

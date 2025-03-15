@@ -9,7 +9,7 @@ use super::{
     backend::Backend,
     container::HandleContainer,
     resources::{Buffer, Sampler, Texture},
-    shader::{PipelineLayout, RasterPipeline},
+    shader::{PipelineLayout, RasterPipeline, ShaderArgument},
 };
 
 #[derive(Debug)]
@@ -75,6 +75,16 @@ impl RenderSystem {
     #[inline]
     pub fn free_pipeline_layout_handle(&self, handle: Handle<PipelineLayout>) {
         self.handles.free_pipeline_layout_handle(handle)
+    }
+
+    #[inline]
+    pub fn create_shader_argument_handle(&self) -> Handle<ShaderArgument> {
+        self.handles.create_shader_argument_handle()
+    }
+
+    #[inline]
+    pub fn free_shader_argument_handle(&self, handle: Handle<ShaderArgument>) {
+        self.handles.free_shader_argument_handle(handle)
     }
 
     #[inline]

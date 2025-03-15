@@ -12,7 +12,7 @@ use crate::rhi::{
 };
 
 use super::{
-    conv::map_format,
+    conv::{map_address_mode, map_filter, map_format},
     device::{Descriptor, DxDevice},
 };
 
@@ -120,7 +120,7 @@ impl RenderResourceDevice for DxDevice {
         };
 
         if let Some(descriptor) = &descriptor {
-            self.create_texture_view(descriptor, &texture.raw, &desc, &texture.desc);
+            self.create_texture_view(descriptor.cpu, &texture.raw, &desc, &texture.desc);
         }
 
         DxTexture {
@@ -179,7 +179,13 @@ impl RenderResourceDevice for DxDevice {
     }
 
     fn create_sampler(&self, desc: SamplerDesc) -> Self::Sampler {
-        DxSampler { desc }
+        let address = map_address_mode(desc.address_mode);
+        DxSampler {
+            desc: dx::SamplerDesc::new(map_filter(desc.filter))
+                .with_address_u(address)
+                .with_address_v(address)
+                .with_address_w(address),
+        }
     }
 
     fn destroy_sampler(&self, _sampler: Self::Sampler) {}
@@ -280,7 +286,7 @@ impl DxDevice {
         };
 
         if let Some(descriptor) = &descriptor {
-            self.create_texture_view(descriptor, &raw, &view, &desc);
+            self.create_texture_view(descriptor.cpu, &raw, &view, &desc);
         }
 
         if let Some(name) = &desc.name {
@@ -331,7 +337,7 @@ impl DxDevice {
             };
 
             if let Some(descriptor) = &descriptor {
-                self.create_texture_view(descriptor, &cross_res, &view, &desc);
+                self.create_texture_view(descriptor.cpu, &cross_res, &view, &desc);
             }
 
             if let Some(name) = &desc.name {
@@ -375,7 +381,7 @@ impl DxDevice {
             };
 
             if let Some(descriptor) = &descriptor {
-                self.create_texture_view(descriptor, &raw, &view, &desc);
+                self.create_texture_view(descriptor.cpu, &raw, &view, &desc);
             }
 
             let cross_desc = raw_desc
@@ -423,7 +429,7 @@ impl DxDevice {
 
     pub(super) fn create_texture_view(
         &self,
-        descriptor: &Descriptor,
+        descriptor: dx::CpuDescriptorHandle,
         texture: &dx::Resource,
         view: &TextureViewDesc,
         desc: &TextureDesc,
@@ -437,7 +443,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_render_target_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_render_target_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::RenderTarget, TextureType::D1Array) => {
                 let mips = view.mips.as_ref().map(|m| m.start).unwrap_or(0);
@@ -448,7 +454,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_render_target_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_render_target_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::RenderTarget, TextureType::D2) => {
                 let mips = view.mips.as_ref().map(|m| m.start).unwrap_or(0);
@@ -459,7 +465,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_render_target_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_render_target_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::RenderTarget, TextureType::D2Array) => {
                 let mips = view.mips.as_ref().map(|m| m.start).unwrap_or(0);
@@ -471,7 +477,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_render_target_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_render_target_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::RenderTarget, TextureType::D3) => {
                 let mips = view.mips.as_ref().map(|m| m.start).unwrap_or(0);
@@ -482,7 +488,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_render_target_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_render_target_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::DepthStencil, TextureType::D1) => {
                 let mips = view.mips.as_ref().map(|m| m.start).unwrap_or(0);
@@ -492,7 +498,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_depth_stencil_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_depth_stencil_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::DepthStencil, TextureType::D1Array) => {
                 let mips = view.mips.as_ref().map(|m| m.start).unwrap_or(0);
@@ -503,7 +509,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_depth_stencil_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_depth_stencil_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::DepthStencil, TextureType::D2) => {
                 let mips = view.mips.as_ref().map(|m| m.start).unwrap_or(0);
@@ -513,7 +519,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_depth_stencil_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_depth_stencil_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::DepthStencil, TextureType::D2Array) => {
                 let mips = view.mips.as_ref().map(|m| m.start).unwrap_or(0);
@@ -524,7 +530,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_depth_stencil_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_depth_stencil_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::DepthStencil, TextureType::D3) => {
                 panic!("Can not create Depth Stencil View for Volume Texture")
@@ -544,7 +550,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_shader_resource_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_shader_resource_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::ShaderResource, TextureType::D1Array) => {
                 let mip_start = view.mips.as_ref().map(|m| m.start).unwrap_or(0) as u32;
@@ -562,7 +568,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_shader_resource_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_shader_resource_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::ShaderResource, TextureType::D2) => {
                 let mip_start = view.mips.as_ref().map(|m| m.start).unwrap_or(0) as u32;
@@ -580,7 +586,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_shader_resource_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_shader_resource_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::ShaderResource, TextureType::D2Array) => {
                 let mip_start = view.mips.as_ref().map(|m| m.start).unwrap_or(0) as u32;
@@ -599,7 +605,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_shader_resource_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_shader_resource_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::ShaderResource, TextureType::D3) => {
                 let mip_start = view.mips.as_ref().map(|m| m.start).unwrap_or(0) as u32;
@@ -616,7 +622,7 @@ impl DxDevice {
                 );
 
                 self.gpu
-                    .create_shader_resource_view(Some(texture), Some(&view), descriptor.cpu);
+                    .create_shader_resource_view(Some(texture), Some(&view), descriptor);
             }
             (TextureViewType::Storage, TextureType::D1) => {
                 let mips = view.mips.as_ref().map(|m| m.start).unwrap_or(0);
@@ -629,7 +635,7 @@ impl DxDevice {
                     Some(texture),
                     dx::RES_NONE,
                     Some(&view),
-                    descriptor.cpu,
+                    descriptor,
                 );
             }
             (TextureViewType::Storage, TextureType::D1Array) => {
@@ -644,7 +650,7 @@ impl DxDevice {
                     Some(texture),
                     dx::RES_NONE,
                     Some(&view),
-                    descriptor.cpu,
+                    descriptor,
                 );
             }
             (TextureViewType::Storage, TextureType::D2) => {
@@ -659,7 +665,7 @@ impl DxDevice {
                     Some(texture),
                     dx::RES_NONE,
                     Some(&view),
-                    descriptor.cpu,
+                    descriptor,
                 );
             }
             (TextureViewType::Storage, TextureType::D2Array) => {
@@ -675,7 +681,7 @@ impl DxDevice {
                     Some(texture),
                     dx::RES_NONE,
                     Some(&view),
-                    descriptor.cpu,
+                    descriptor,
                 );
             }
             (TextureViewType::Storage, TextureType::D3) => {
@@ -690,7 +696,7 @@ impl DxDevice {
                     Some(texture),
                     dx::RES_NONE,
                     Some(&view),
-                    descriptor.cpu,
+                    descriptor,
                 );
             }
         }
@@ -699,5 +705,5 @@ impl DxDevice {
 
 #[derive(Debug)]
 pub struct DxSampler {
-    pub(super) desc: SamplerDesc,
+    pub(super) desc: dx::SamplerDesc,
 }

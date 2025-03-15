@@ -4,7 +4,7 @@ use crate::collections::handle::{Handle, HandleAllocator};
 
 use super::{
     resources::{Buffer, Sampler, Texture},
-    shader::{PipelineLayout, RasterPipeline},
+    shader::{PipelineLayout, RasterPipeline, ShaderArgument},
 };
 
 #[derive(Debug)]
@@ -14,6 +14,7 @@ pub struct HandleContainer {
     pub(super) samplers: Mutex<HandleAllocator<Sampler>>,
 
     pub(super) pipeline_layouts: Mutex<HandleAllocator<PipelineLayout>>,
+    pub(super) shader_arguments: Mutex<HandleAllocator<ShaderArgument>>,
     pub(super) raster_pipeline: Mutex<HandleAllocator<RasterPipeline>>,
 }
 
@@ -24,6 +25,7 @@ impl HandleContainer {
             textures: Mutex::new(HandleAllocator::new()),
             samplers: Mutex::new(HandleAllocator::new()),
             pipeline_layouts: Mutex::new(HandleAllocator::new()),
+            shader_arguments: Mutex::new(HandleAllocator::new()),
             raster_pipeline: Mutex::new(HandleAllocator::new()),
         }
     }
@@ -66,6 +68,16 @@ impl HandleContainer {
     #[inline]
     pub(super) fn free_pipeline_layout_handle(&self, handle: Handle<PipelineLayout>) {
         self.pipeline_layouts.lock().free(handle);
+    }
+
+    #[inline]
+    pub(super) fn create_shader_argument_handle(&self) -> Handle<ShaderArgument> {
+        self.shader_arguments.lock().allocate()
+    }
+
+    #[inline]
+    pub(super) fn free_shader_argument_handle(&self, handle: Handle<ShaderArgument>) {
+        self.shader_arguments.lock().free(handle);
     }
 
     #[inline]

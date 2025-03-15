@@ -1,16 +1,22 @@
-use oxidx::dx::{self, IBlobExt, IDevice};
+use oxidx::dx::{self, IBlobExt, IDevice, IResource};
 
 use crate::rhi::{
     dx12::conv::{map_cull_mode, map_depth_op, map_format, map_semantic, map_vertex_format},
-    shader::{BindingType, PipelineLayoutDesc, RasterPipelineDesc, RenderShaderDevice},
+    shader::{
+        BindingType, PipelineLayoutDesc, RasterPipelineDesc, RenderShaderDevice,
+        ShaderArgumentDesc, ShaderEntry,
+    },
     types::ShaderType,
 };
 
-use super::{conv::map_static_sampler, device::DxDevice};
+use super::{
+    conv::map_static_sampler,
+    device::{Descriptor, DxDevice},
+};
 
 impl RenderShaderDevice for DxDevice {
     type PipelineLayout = DxPipelineLayout;
-    type ShaderArgument = ();
+    type ShaderArgument = DxShaderArgument;
     type RasterPipeline = DxRenderPipeline;
 
     fn create_pipeline_layout(&self, desc: PipelineLayoutDesc<'_>) -> Self::PipelineLayout {
@@ -94,13 +100,71 @@ impl RenderShaderDevice for DxDevice {
 
     fn create_shader_argument(
         &self,
-        desc: crate::rhi::shader::ShaderArgumentDesc<'_, '_, Self>,
+        desc: ShaderArgumentDesc<'_, '_, Self>,
     ) -> Self::ShaderArgument {
-        todo!()
+        let views = if desc.views.len() > 0 {
+            let size = self.descriptors.shader_heap.lock().inc_size;
+            let views = self
+                .descriptors
+                .allocate(dx::DescriptorHeapType::CbvSrvUav, desc.views.len());
+
+            for (i, view) in desc.views.iter().enumerate() {
+                match view {
+                    ShaderEntry::Cbv(buffer, buffer_size) => self.gpu.create_constant_buffer_view(
+                        Some(&dx::ConstantBufferViewDesc::new(
+                            buffer.raw.get_gpu_virtual_address(),
+                            *buffer_size,
+                        )),
+                        views.cpu.advance(i, size),
+                    ),
+                    ShaderEntry::Srv(texture) | ShaderEntry::Uav(texture) => self
+                        .create_texture_view(
+                            views.cpu.advance(i, size),
+                            &texture.raw,
+                            &texture.view,
+                            &texture.desc,
+                        ),
+                }
+            }
+
+            Some(views)
+        } else {
+            None
+        };
+
+        let samplers = if desc.samplers.len() > 0 {
+            let size = self.descriptors.sampler_heap.lock().inc_size;
+            let samplers = self
+                .descriptors
+                .allocate(dx::DescriptorHeapType::Sampler, desc.samplers.len());
+
+            for (i, sampler) in desc.samplers.iter().enumerate() {
+                self.gpu
+                    .create_sampler(&sampler.desc, samplers.cpu.advance(i, size));
+            }
+
+            Some(samplers)
+        } else {
+            None
+        };
+
+        let dynamic_address = desc.dynamic_buffer.map(|b| b.raw.get_gpu_virtual_address());
+
+        DxShaderArgument {
+            views,
+            samplers,
+            dynamic_address,
+        }
     }
 
     fn destroy_shader_argument(&self, argument: Self::ShaderArgument) {
-        todo!()
+        if let Some(views) = argument.views {
+            self.descriptors.shader_heap.lock().free(views);
+        }
+
+        if let Some(samplers) = argument.samplers {
+            self.descriptors.sampler_heap.lock().free(samplers);
+        }
     }
 
     fn create_raster_pipeline(&self, desc: RasterPipelineDesc<'_, Self>) -> Self::RasterPipeline {
@@ -201,8 +265,15 @@ pub struct DxPipelineLayout {
     pub(super) raw: dx::RootSignature,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct DxRenderPipeline {
     pub(super) raw: dx::PipelineState,
     pub(super) layout: Option<DxPipelineLayout>,
+}
+
+#[derive(Debug)]
+pub struct DxShaderArgument {
+    pub(super) views: Option<Descriptor>,
+    pub(super) samplers: Option<Descriptor>,
+    pub(super) dynamic_address: Option<u64>,
 }

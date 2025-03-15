@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use ra::{
     context::ContextDual,
     resources::RenderResourceContext,
-    shader::RenderShaderContext,
+    shader::{RenderShaderContext, ShaderArgumentDesc, ShaderEntry},
     system::{RenderBackend, RenderBackendSettings, RenderSystem},
 };
 use rhi::{
     backend::{Api, DebugFlags},
-    resources::TextureUsages,
+    resources::{TextureUsages, TextureViewDesc, TextureViewType},
     shader::BindingSet,
     types::{CullMode, Format, InputElementDesc, ShaderType, VertexAttribute, VertexType},
 };
@@ -103,5 +103,78 @@ fn main() {
 
         ctx.unbind_pipeline_layout(layout);
         ctx.unbind_raster_pipeline(pipeline);
+    });
+
+    let diffuse = rs.create_texture_handle();
+    let normal = rs.create_texture_handle();
+    let material = rs.create_texture_handle();
+
+    let diffuse_srv = rs.create_texture_handle();
+    let normal_srv = rs.create_texture_handle();
+    let material_srv = rs.create_texture_handle();
+
+    let light_pass_argument = rs.create_shader_argument_handle();
+
+    group.call(|ctx| {
+        ctx.bind_texture(
+            diffuse,
+            rhi::resources::TextureDesc::new_2d(
+                [1920, 1080],
+                Format::Rgba32,
+                TextureUsages::RenderTarget | TextureUsages::Resource,
+            ),
+            None,
+        );
+
+        ctx.bind_texture(
+            normal,
+            rhi::resources::TextureDesc::new_2d(
+                [1920, 1080],
+                Format::Rgba32,
+                TextureUsages::RenderTarget | TextureUsages::Resource,
+            ),
+            None,
+        );
+
+        ctx.bind_texture(
+            material,
+            rhi::resources::TextureDesc::new_2d(
+                [1920, 1080],
+                Format::Rgba32,
+                TextureUsages::RenderTarget | TextureUsages::Resource,
+            ),
+            None,
+        );
+
+        ctx.bind_texture_view(
+            diffuse_srv,
+            diffuse,
+            TextureViewDesc::default().with_view_type(TextureViewType::ShaderResource),
+        );
+
+        ctx.bind_texture_view(
+            normal_srv,
+            normal,
+            TextureViewDesc::default().with_view_type(TextureViewType::ShaderResource),
+        );
+
+        ctx.bind_texture_view(
+            material_srv,
+            material,
+            TextureViewDesc::default().with_view_type(TextureViewType::ShaderResource),
+        );
+
+        ctx.bind_shader_argument(
+            light_pass_argument,
+            ShaderArgumentDesc {
+                views: &[
+                    ShaderEntry::Srv(diffuse_srv),
+                    ShaderEntry::Srv(normal_srv),
+                    ShaderEntry::Srv(material_srv),
+                ],
+                samplers: &[],
+                dynamic_buffer: None,
+            },
+        );
     });
 }

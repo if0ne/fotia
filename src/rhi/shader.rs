@@ -70,16 +70,16 @@ pub struct PipelineLayoutDesc<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ShaderArgument<'a, D: RenderResourceDevice> {
+pub enum ShaderEntry<'a, D: RenderResourceDevice> {
     Cbv(&'a D::Buffer, usize),
     Srv(&'a D::Texture),
     Uav(&'a D::Texture),
-    Sample(&'a D::Sampler),
 }
 
 #[derive(Clone, Debug)]
 pub struct ShaderArgumentDesc<'a, 'b, D: RenderResourceDevice> {
-    pub arguments: &'a [ShaderArgument<'b, D>],
+    pub views: &'a [ShaderEntry<'b, D>],
+    pub samplers: &'a [&'b D::Sampler],
     pub dynamic_buffer: Option<&'b D::Buffer>,
 }
 

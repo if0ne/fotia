@@ -1,6 +1,7 @@
 use crate::{
     collections::handle::Handle,
     rhi::{
+        self,
         command::RenderCommandDevice,
         resources::RenderResourceDevice,
         shader::{CompiledShader, PipelineLayoutDesc, RenderShaderDevice},
@@ -8,10 +9,16 @@ use crate::{
     },
 };
 
-use super::context::Context;
+use super::{
+    context::Context,
+    resources::{Buffer, Sampler, Texture},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PipelineLayout;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ShaderArgument;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RasterPipeline;
@@ -19,6 +26,9 @@ pub struct RasterPipeline;
 pub trait RenderShaderContext {
     fn bind_pipeline_layout(&self, handle: Handle<PipelineLayout>, desc: PipelineLayoutDesc<'_>);
     fn unbind_pipeline_layout(&self, handle: Handle<PipelineLayout>);
+
+    fn bind_shader_argument(&self, handle: Handle<ShaderArgument>, desc: ShaderArgumentDesc<'_>);
+    fn unbind_shader_argument(&self, handle: Handle<ShaderArgument>);
 
     fn bind_raster_pipeline(&self, handle: Handle<RasterPipeline>, desc: RasterPipelineDesc<'_>);
     fn unbind_raster_pipeline(&self, handle: Handle<RasterPipeline>);
@@ -41,6 +51,59 @@ impl<D: RenderResourceDevice + RenderShaderDevice + RenderCommandDevice> RenderS
         };
 
         self.gpu.destroy_pipeline_layout(layout);
+    }
+
+    fn bind_shader_argument(&self, handle: Handle<ShaderArgument>, desc: ShaderArgumentDesc<'_>) {
+        let buffers = self.mapper.buffers.lock();
+        let textures = self.mapper.textures.lock();
+        let samplers = self.mapper.samplers.lock();
+
+        let views = desc
+            .views
+            .iter()
+            .map(|e| match e {
+                ShaderEntry::Cbv(handle, size) => rhi::shader::ShaderEntry::Cbv(
+                    buffers.get(*handle).expect("failed to get buffer"),
+                    *size,
+                ),
+                ShaderEntry::Srv(handle) => rhi::shader::ShaderEntry::Srv(
+                    textures.get(*handle).expect("failed to get texture"),
+                ),
+                ShaderEntry::Uav(handle) => rhi::shader::ShaderEntry::Uav(
+                    textures.get(*handle).expect("failed to get texture"),
+                ),
+            })
+            .collect::<Vec<_>>();
+
+        let samplers = desc
+            .samplers
+            .iter()
+            .map(|s| samplers.get(*s).expect("failed to get sampler"))
+            .collect::<Vec<_>>();
+
+        let dynamic_buffer = desc
+            .dynamic_buffer
+            .map(|b| buffers.get(b).expect("failed to get buffer"));
+
+        let desc = rhi::shader::ShaderArgumentDesc {
+            views: &views,
+            samplers: &samplers,
+            dynamic_buffer,
+        };
+
+        let argument = self.gpu.create_shader_argument(desc);
+
+        if let Some(argument) = self.mapper.shader_arguments.lock().set(handle, argument) {
+            self.gpu.destroy_shader_argument(argument);
+        }
+    }
+
+    fn unbind_shader_argument(&self, handle: Handle<ShaderArgument>) {
+        let Some(argument) = self.mapper.shader_arguments.lock().remove(handle) else {
+            return;
+        };
+
+        self.gpu.destroy_shader_argument(argument);
     }
 
     fn bind_raster_pipeline(&self, handle: Handle<RasterPipeline>, desc: RasterPipelineDesc<'_>) {
@@ -91,4 +154,18 @@ pub struct RasterPipelineDesc<'a> {
 
     pub vs: &'a CompiledShader,
     pub shaders: &'a [CompiledShader],
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ShaderEntry {
+    Cbv(Handle<Buffer>, usize),
+    Srv(Handle<Texture>),
+    Uav(Handle<Texture>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ShaderArgumentDesc<'a> {
+    pub views: &'a [ShaderEntry],
+    pub samplers: &'a [Handle<Sampler>],
+    pub dynamic_buffer: Option<Handle<Buffer>>,
 }
