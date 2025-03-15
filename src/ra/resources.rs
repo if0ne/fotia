@@ -3,14 +3,13 @@ use parking_lot::Mutex;
 use crate::{
     collections::{handle::Handle, sparse_array::SparseArray},
     rhi::{
-        command::{IoCommandBuffer, RenderCommandDevice, RenderCommandQueue},
-        resources::{BufferDesc, RenderResourceDevice, SamplerDesc, TextureDesc, TextureViewDesc},
-        shader::RenderShaderDevice,
+        command::{IoCommandBuffer, RenderCommandQueue},
+        resources::{BufferDesc, SamplerDesc, TextureDesc, TextureViewDesc},
     },
 };
 
 use super::{
-    context::Context,
+    context::{Context, RenderDevice},
     shader::{PipelineLayout, RasterPipeline, ShaderArgument},
 };
 
@@ -44,9 +43,7 @@ pub trait RenderResourceContext {
     fn unbind_sampler(&self, handle: Handle<Sampler>);
 }
 
-impl<D: RenderResourceDevice + RenderCommandDevice + RenderShaderDevice> RenderResourceContext
-    for Context<D>
-{
+impl<D: RenderDevice> RenderResourceContext for Context<D> {
     fn bind_buffer(&self, handle: Handle<Buffer>, desc: BufferDesc, init_data: Option<&[u8]>) {
         let buffer = self.gpu.create_buffer(desc);
 
@@ -137,7 +134,7 @@ impl<D: RenderResourceDevice + RenderCommandDevice + RenderShaderDevice> RenderR
     }
 }
 
-pub(super) struct ResourceMapper<D: RenderResourceDevice + RenderShaderDevice> {
+pub(super) struct ResourceMapper<D: RenderDevice> {
     pub(super) buffers: Mutex<SparseArray<Buffer, D::Buffer>>,
     pub(super) textures: Mutex<SparseArray<Texture, D::Texture>>,
     pub(super) samplers: Mutex<SparseArray<Sampler, D::Sampler>>,
@@ -147,7 +144,7 @@ pub(super) struct ResourceMapper<D: RenderResourceDevice + RenderShaderDevice> {
     pub(super) raster_pipelines: Mutex<SparseArray<RasterPipeline, D::RasterPipeline>>,
 }
 
-impl<D: RenderResourceDevice + RenderShaderDevice> Default for ResourceMapper<D> {
+impl<D: RenderDevice> Default for ResourceMapper<D> {
     fn default() -> Self {
         Self {
             buffers: Mutex::new(SparseArray::new(128)),

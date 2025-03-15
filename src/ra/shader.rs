@@ -2,15 +2,13 @@ use crate::{
     collections::handle::Handle,
     rhi::{
         self,
-        command::RenderCommandDevice,
-        resources::RenderResourceDevice,
-        shader::{CompiledShader, PipelineLayoutDesc, RenderShaderDevice},
+        shader::{CompiledShader, PipelineLayoutDesc},
         types::{CullMode, DepthStateDesc, Format, InputElementDesc},
     },
 };
 
 use super::{
-    context::Context,
+    context::{Context, RenderDevice},
     resources::{Buffer, Sampler, Texture},
 };
 
@@ -34,9 +32,7 @@ pub trait RenderShaderContext {
     fn unbind_raster_pipeline(&self, handle: Handle<RasterPipeline>);
 }
 
-impl<D: RenderResourceDevice + RenderShaderDevice + RenderCommandDevice> RenderShaderContext
-    for Context<D>
-{
+impl<D: RenderDevice> RenderShaderContext for Context<D> {
     fn bind_pipeline_layout(&self, handle: Handle<PipelineLayout>, desc: PipelineLayoutDesc<'_>) {
         let layout = self.gpu.create_pipeline_layout(desc);
 
