@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use ra::{
     command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
     context::{ContextDual, RenderDevice},
@@ -10,12 +12,14 @@ use rhi::{
     swapchain::{PresentMode, SwapchainDesc},
     types::ResourceState,
 };
+use timer::GameTimer;
 use tracing_subscriber::layer::SubscriberExt;
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 pub mod collections;
 pub mod ra;
 pub mod rhi;
+pub mod timer;
 
 fn main() {
     let console_log = tracing_subscriber::fmt::Layer::new()
@@ -41,6 +45,8 @@ fn main() {
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
     let mut app = Application {
+        timer: GameTimer::default(),
+
         rs,
         context: group,
         wnd_ctx: None,
@@ -58,6 +64,8 @@ pub struct WindowContext<D: RenderDevice> {
 }
 
 pub struct Application<D: RenderDevice> {
+    pub timer: GameTimer,
+
     pub wnd_ctx: Option<WindowContext<D>>,
     pub rs: RenderSystem,
     pub context: ContextDual<D>,
@@ -105,7 +113,13 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
         event: winit::event::WindowEvent,
     ) {
         match event {
-            winit::event::WindowEvent::Focused(_) => {}
+            winit::event::WindowEvent::Focused(focused) => {
+                if focused {
+                    self.timer.start();
+                } else {
+                    self.timer.stop();
+                }
+            }
             winit::event::WindowEvent::KeyboardInput { event, .. } => match event.state {
                 winit::event::ElementState::Pressed => {
                     if event.physical_key == winit::keyboard::KeyCode::Escape {
@@ -129,6 +143,9 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                 }
             }
             winit::event::WindowEvent::RedrawRequested => {
+                self.timer.tick();
+                self.calculate_frame_stats();
+
                 let Some(wnd) = &mut self.wnd_ctx else {
                     return;
                 };
@@ -178,5 +195,36 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
         if let Some(context) = self.wnd_ctx.as_ref() {
             context.window.request_redraw();
         }
+    }
+}
+
+impl<D: RenderDevice> Application<D> {
+    fn calculate_frame_stats(&self) {
+        thread_local! {
+            static FRAME_COUNT: RefCell<i32> = Default::default();
+            static TIME_ELAPSED: RefCell<f32> = Default::default();
+        }
+
+        FRAME_COUNT.with_borrow_mut(|frame_cnt| {
+            *frame_cnt += 1;
+        });
+
+        TIME_ELAPSED.with_borrow_mut(|time_elapsed| {
+            if self.timer.total_time() - *time_elapsed > 1.0 {
+                FRAME_COUNT.with_borrow_mut(|frame_count| {
+                    let fps = *frame_count as f32;
+                    let mspf = 1000.0 / fps;
+
+                    if let Some(ref context) = self.wnd_ctx {
+                        context
+                            .window
+                            .set_title(&format!("{} Fps: {fps} Ms: {mspf}", "Fotia"))
+                    }
+
+                    *frame_count = 0;
+                    *time_elapsed += 1.0;
+                });
+            }
+        })
     }
 }
