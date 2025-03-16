@@ -28,7 +28,7 @@ impl<A: Api<Device: RenderDevice>> Api for Backend<A> {
         Context::new(gpu)
     }
 
-    fn compile_shader(&self, desc: ShaderDesc) -> CompiledShader {
+    fn compile_shader(&self, desc: &ShaderDesc) -> CompiledShader {
         self.api.compile_shader(desc)
     }
 }

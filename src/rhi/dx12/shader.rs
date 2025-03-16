@@ -233,7 +233,7 @@ impl RenderShaderDevice for DxDevice {
             .map(|s| {
                 (
                     dx::Blob::from_bytes(&s.raw).expect("failed to create blob"),
-                    s.desc.ty,
+                    s.ty,
                 )
             })
             .collect::<Vec<_>>();

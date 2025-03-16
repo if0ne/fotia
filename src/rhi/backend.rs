@@ -8,7 +8,7 @@ pub trait Api {
     fn enumerate_devices(&self) -> impl Iterator<Item = &RenderDeviceInfo> + '_;
     fn create_device(&self, index: RenderDeviceId) -> Self::Device;
 
-    fn compile_shader(&self, desc: ShaderDesc) -> CompiledShader;
+    fn compile_shader(&self, desc: &ShaderDesc) -> CompiledShader;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

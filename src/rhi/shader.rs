@@ -8,7 +8,7 @@ use super::{
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CompiledShader {
     pub raw: Vec<u8>,
-    pub desc: ShaderDesc,
+    pub ty: ShaderType,
 }
 
 pub trait RenderShaderDevice: RenderResourceDevice {

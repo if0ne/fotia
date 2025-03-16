@@ -195,7 +195,7 @@ impl Api for DxBackend {
         )
     }
 
-    fn compile_shader(&self, desc: ShaderDesc) -> CompiledShader {
+    fn compile_shader(&self, desc: &ShaderDesc) -> CompiledShader {
         let target = match desc.ty {
             ShaderType::Vertex => c"vs_5_1",
             ShaderType::Pixel => c"ps_5_1",
@@ -236,6 +236,6 @@ impl Api for DxBackend {
         let mut raw = vec![0; raw.get_buffer_size()];
         raw.clone_from_slice(slice);
 
-        CompiledShader { raw, desc }
+        CompiledShader { raw, ty: desc.ty }
     }
 }
