@@ -116,14 +116,14 @@ impl<D: RenderDevice> RenderSwapchainContext for Context<D> {
 }
 
 pub trait Surface {
-    fn next_frame(&mut self) -> &SwapchainFrame<Handle<Texture>>;
+    fn next_frame(&mut self) -> &mut SwapchainFrame<Handle<Texture>>;
     fn present(&self);
 }
 
 impl<D: RenderDevice> Surface for Swapchain<D> {
-    fn next_frame(&mut self) -> &SwapchainFrame<Handle<Texture>> {
+    fn next_frame(&mut self) -> &mut SwapchainFrame<Handle<Texture>> {
         let idx = self.raw.next_frame_index();
-        &self.frames[idx]
+        &mut self.frames[idx]
     }
 
     fn present(&self) {

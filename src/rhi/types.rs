@@ -115,3 +115,10 @@ pub enum IndexType {
     U16,
     U32,
 }
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub enum ResourceState {
+    Common,
+    RenderTarget,
+    Present,
+}

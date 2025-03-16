@@ -330,7 +330,7 @@ impl DxDevice {
 
             let descriptor = if desc.usage.contains(TextureUsages::RenderTarget) {
                 Some(self.descriptors.allocate(dx::DescriptorHeapType::Rtv, 1))
-            } else if (desc.usage.contains(TextureUsages::DepthTarget)) {
+            } else if desc.usage.contains(TextureUsages::DepthTarget) {
                 Some(self.descriptors.allocate(dx::DescriptorHeapType::Dsv, 1))
             } else {
                 None

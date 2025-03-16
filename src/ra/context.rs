@@ -19,10 +19,12 @@ pub trait RenderDevice:
                 Device = Self,
                 RenderEncoder<'a>: RenderEncoder<
                     Buffer = Self::Buffer,
+                    Texture = Self::Texture,
                     ShaderArgument = Self::ShaderArgument,
                     RasterPipeline = Self::RasterPipeline,
                 >,
             >,
+            Event = Self::Event,
         >,
     > + RenderShaderDevice
     + RenderSwapchainDevice<Swapchain: Surface<Texture = Self::Texture>, Queue = Self::CommandQueue>
@@ -37,10 +39,12 @@ impl<T> RenderDevice for T where
                     Device = T,
                     RenderEncoder<'a>: RenderEncoder<
                         Buffer = T::Buffer,
+                        Texture = T::Texture,
                         ShaderArgument = T::ShaderArgument,
                         RasterPipeline = T::RasterPipeline,
                     >,
                 >,
+                Event = T::Event,
             >,
         > + RenderShaderDevice
         + RenderSwapchainDevice<Swapchain: Surface<Texture = Self::Texture>, Queue = T::CommandQueue>
@@ -111,11 +115,11 @@ impl<D: RenderDevice> ContextDual<D> {
         func(&self.secondary);
     }
 
-    pub fn call_primary(&self, func: impl Fn(&Context<D>)) {
+    pub fn call_primary(&self, mut func: impl FnMut(&Context<D>)) {
         func(&self.primary);
     }
 
-    pub fn call_secondary(&self, func: impl Fn(&Context<D>)) {
+    pub fn call_secondary(&self, mut func: impl FnMut(&Context<D>)) {
         func(&self.secondary);
     }
 }

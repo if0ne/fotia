@@ -11,7 +11,7 @@ use parking_lot::Mutex;
 
 use crate::rhi::{
     command::{
-        CommandType, GpuEvent, IoCommandBuffer, RenderCommandBuffer, RenderCommandDevice,
+        Barrier, CommandType, GpuEvent, IoCommandBuffer, RenderCommandBuffer, RenderCommandDevice,
         RenderCommandQueue, RenderEncoder, RenderResourceUploader, SyncPoint,
     },
     resources::{BufferDesc, BufferUsages, MemoryLocation, RenderResourceDevice},
@@ -19,7 +19,7 @@ use crate::rhi::{
 };
 
 use super::{
-    conv::map_command_buffer_type,
+    conv::{map_command_buffer_type, map_resource_state},
     device::DxDevice,
     resources::{DxBuffer, DxTexture},
     shader::{DxRasterPipeline, DxShaderArgument},
@@ -299,6 +299,48 @@ impl RenderCommandBuffer for DxCommandBuffer {
         ]);
     }
 
+    fn set_barriers(&mut self, barriers: &[Barrier<'_, Self::Device>]) {
+        let barriers = barriers
+            .iter()
+            .filter_map(|b| match b {
+                Barrier::Buffer(buffer, resource_state) => {
+                    let new_state = map_resource_state(*resource_state);
+                    let old_state = std::mem::replace(&mut *buffer.state.lock(), new_state);
+
+                    if old_state != new_state {
+                        Some(dx::ResourceBarrier::transition(
+                            &buffer.raw,
+                            old_state,
+                            new_state,
+                            None,
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                Barrier::Texture(texture, resource_state) => {
+                    let new_state = map_resource_state(*resource_state);
+                    let old_state = std::mem::replace(&mut *texture.state.lock(), new_state);
+
+                    if old_state != new_state {
+                        Some(dx::ResourceBarrier::transition(
+                            &texture.raw,
+                            old_state,
+                            new_state,
+                            None,
+                        ))
+                    } else {
+                        None
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
+        if !barriers.is_empty() {
+            self.list.resource_barrier(&barriers);
+        }
+    }
+
     fn render(
         &mut self,
         targets: &[&DxTexture],
@@ -517,8 +559,17 @@ pub struct DxRenderEncoder<'a> {
 
 impl<'a> RenderEncoder for DxRenderEncoder<'a> {
     type Buffer = DxBuffer;
+    type Texture = DxTexture;
     type RasterPipeline = DxRasterPipeline;
     type ShaderArgument = DxShaderArgument;
+
+    fn clear_rt(&mut self, texture: &Self::Texture, color: [f32; 4]) {
+        if let Some(descriptor) = &texture.descriptor {
+            self.cmd
+                .list
+                .clear_render_target_view(descriptor.cpu, color, &[]);
+        }
+    }
 
     fn set_viewport(&mut self, viewport: Viewport) {
         self.cmd

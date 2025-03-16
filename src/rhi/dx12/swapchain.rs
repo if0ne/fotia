@@ -156,9 +156,9 @@ impl Surface for Swapchain {
         self.raw.get_current_back_buffer_index() as usize
     }
 
-    fn next_frame(&mut self) -> &SwapchainFrame<Self::Texture> {
+    fn next_frame(&mut self) -> &mut SwapchainFrame<Self::Texture> {
         let next_idx = self.raw.get_current_back_buffer_index() as usize;
-        &self.resources[next_idx]
+        &mut self.resources[next_idx]
     }
 
     fn present(&self) {

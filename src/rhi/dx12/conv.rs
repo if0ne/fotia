@@ -4,7 +4,9 @@ use crate::rhi::{
     command::CommandType,
     resources::{TextureDesc, TextureType, TextureUsages},
     shader::StaticSampler,
-    types::{AddressMode, CullMode, DepthOp, Filter, Format, VertexAttribute, VertexType},
+    types::{
+        AddressMode, CullMode, DepthOp, Filter, Format, ResourceState, VertexAttribute, VertexType,
+    },
 };
 
 pub(super) fn map_command_buffer_type(ty: CommandType) -> dx::CommandListType {
@@ -146,5 +148,13 @@ pub(super) fn map_depth_op(op: DepthOp) -> dx::ComparisonFunc {
         DepthOp::Equal => dx::ComparisonFunc::Equal,
         DepthOp::LessEqual => dx::ComparisonFunc::LessEqual,
         DepthOp::Greater => dx::ComparisonFunc::Greater,
+    }
+}
+
+pub(super) fn map_resource_state(state: ResourceState) -> dx::ResourceStates {
+    match state {
+        ResourceState::Common => dx::ResourceStates::Common,
+        ResourceState::RenderTarget => dx::ResourceStates::RenderTarget,
+        ResourceState::Present => dx::ResourceStates::Present,
     }
 }

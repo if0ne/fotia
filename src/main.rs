@@ -1,11 +1,14 @@
 use ra::{
+    command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
     context::{ContextDual, RenderDevice},
-    swapchain::{RenderSwapchainContext, Swapchain},
+    swapchain::{RenderSwapchainContext, Surface, Swapchain},
     system::{RenderBackend, RenderBackendSettings, RenderSystem},
 };
 use rhi::{
     backend::{Api, DebugFlags},
+    command::CommandType,
     swapchain::{PresentMode, SwapchainDesc},
+    types::ResourceState,
 };
 use tracing_subscriber::layer::SubscriberExt;
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -44,6 +47,8 @@ fn main() {
     };
 
     event_loop.run_app(&mut app).expect("failed to run app");
+
+    app.context.call(|ctx| ctx.wait_idle());
 }
 
 pub struct WindowContext<D: RenderDevice> {
@@ -123,7 +128,34 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                     );
                 }
             }
-            winit::event::WindowEvent::RedrawRequested => {}
+            winit::event::WindowEvent::RedrawRequested => {
+                let Some(wnd) = &mut self.wnd_ctx else {
+                    return;
+                };
+
+                let frame = wnd.swapchain.next_frame();
+                self.context.call_primary(|ctx| {
+                    ctx.wait_on_cpu(CommandType::Graphics, frame.last_access);
+                    let mut encoder = ctx.create_encoder(CommandType::Graphics);
+
+                    encoder.set_barriers(&[Barrier::Texture(
+                        frame.texture,
+                        ResourceState::RenderTarget,
+                    )]);
+                    {
+                        let mut encoder = encoder.render(&[], None);
+                        encoder.clear_rt(frame.texture, [0.5, 0.32, 0.16, 1.0]);
+                    }
+
+                    encoder
+                        .set_barriers(&[Barrier::Texture(frame.texture, ResourceState::Present)]);
+
+                    ctx.commit(encoder);
+                    frame.last_access = ctx.submit(CommandType::Graphics);
+                });
+
+                wnd.swapchain.present();
+            }
             winit::event::WindowEvent::CloseRequested => event_loop.exit(),
             _ => (),
         }

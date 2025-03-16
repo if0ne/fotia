@@ -40,7 +40,7 @@ pub trait Surface {
 
     fn drain_frames(&mut self) -> Vec<SwapchainFrame<Self::Texture>>;
     fn next_frame_index(&mut self) -> usize;
-    fn next_frame(&mut self) -> &SwapchainFrame<Self::Texture>;
+    fn next_frame(&mut self) -> &mut SwapchainFrame<Self::Texture>;
     fn present(&self);
 }
 

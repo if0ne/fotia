@@ -1,6 +1,6 @@
 use super::{
     resources::RenderResourceDevice,
-    types::{IndexType, Scissor, Viewport},
+    types::{IndexType, ResourceState, Scissor, Viewport},
 };
 
 pub type SyncPoint = u64;
@@ -10,6 +10,12 @@ pub enum CommandType {
     Graphics,
     Compute,
     Transfer,
+}
+
+#[derive(Debug)]
+pub enum Barrier<'a, D: RenderResourceDevice> {
+    Buffer(&'a D::Buffer, ResourceState),
+    Texture(&'a D::Texture, ResourceState),
 }
 
 pub trait RenderCommandDevice: RenderResourceDevice {
@@ -75,6 +81,8 @@ pub trait RenderCommandBuffer {
 
     fn begin(&mut self, device: &Self::Device);
 
+    fn set_barriers(&mut self, barriers: &[Barrier<'_, Self::Device>]);
+
     fn render(
         &mut self,
         targets: &[&<Self::Device as RenderResourceDevice>::Texture],
@@ -91,8 +99,11 @@ pub trait GpuEvent {
 
 pub trait RenderEncoder {
     type Buffer;
+    type Texture;
     type RasterPipeline;
     type ShaderArgument;
+
+    fn clear_rt(&mut self, texture: &Self::Texture, color: [f32; 4]);
 
     fn set_viewport(&mut self, viewport: Viewport);
     fn set_scissor(&mut self, scissor: Scissor);
