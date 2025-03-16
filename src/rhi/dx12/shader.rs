@@ -1,4 +1,5 @@
 use oxidx::dx::{self, IBlobExt, IDevice, IResource};
+use smallvec::SmallVec;
 
 use crate::rhi::{
     dx12::conv::{map_cull_mode, map_depth_op, map_format, map_semantic, map_vertex_format},
@@ -75,13 +76,13 @@ impl RenderShaderDevice for DxDevice {
             .into_iter()
             .map(|(set, idx)| dx::RootParameter::cbv(idx as u32, set as u32))
             .chain(tables.into_iter())
-            .collect::<Vec<_>>();
+            .collect::<SmallVec<[_; 8]>>();
 
         let samplers = desc
             .static_samplers
             .iter()
             .map(|sampler| map_static_sampler(sampler))
-            .collect::<Vec<_>>();
+            .collect::<SmallVec<[_; 8]>>();
 
         let desc = dx::RootSignatureDesc::default()
             .with_parameters(&parameters)
@@ -98,25 +99,32 @@ impl RenderShaderDevice for DxDevice {
 
     fn destroy_pipeline_layout(&self, _layout: Self::PipelineLayout) {}
 
-    fn create_shader_argument(
+    fn create_shader_argument<
+        'a,
+        V: IntoIterator<Item = ShaderEntry<'a, Self>>,
+        S: IntoIterator<Item = &'a Self::Sampler>,
+    >(
         &self,
-        desc: ShaderArgumentDesc<'_, '_, Self>,
+        desc: ShaderArgumentDesc<'a, Self, V, S>,
     ) -> Self::ShaderArgument {
         let mut dynamic_index = 0;
-        let views = if desc.views.len() > 0 {
+        let desc_views = desc.views.into_iter();
+        let desc_samplers = desc.samplers.into_iter();
+
+        let views = if desc_views.size_hint().0 > 0 {
             let size = self.descriptors.shader_heap.lock().inc_size;
             let views = self
                 .descriptors
-                .allocate(dx::DescriptorHeapType::CbvSrvUav, desc.views.len());
+                .allocate(dx::DescriptorHeapType::CbvSrvUav, desc_views.size_hint().0);
 
-            for (i, view) in desc.views.iter().enumerate() {
+            for (i, view) in desc_views.into_iter().enumerate() {
                 match view {
                     ShaderEntry::Cbv(buffer, buffer_size) => {
                         dynamic_index += 1;
                         self.gpu.create_constant_buffer_view(
                             Some(&dx::ConstantBufferViewDesc::new(
                                 buffer.raw.get_gpu_virtual_address(),
-                                *buffer_size,
+                                buffer_size,
                             )),
                             views.cpu.advance(i, size),
                         )
@@ -136,13 +144,13 @@ impl RenderShaderDevice for DxDevice {
             None
         };
 
-        let samplers = if desc.samplers.len() > 0 {
+        let samplers = if desc_samplers.size_hint().0 > 0 {
             let size = self.descriptors.sampler_heap.lock().inc_size;
             let samplers = self
                 .descriptors
-                .allocate(dx::DescriptorHeapType::Sampler, desc.samplers.len());
+                .allocate(dx::DescriptorHeapType::Sampler, desc_samplers.size_hint().0);
 
-            for (i, sampler) in desc.samplers.iter().enumerate() {
+            for (i, sampler) in desc_samplers.into_iter().enumerate() {
                 self.gpu
                     .create_sampler(&sampler.desc, samplers.cpu.advance(i, size));
             }
@@ -183,7 +191,7 @@ impl RenderShaderDevice for DxDevice {
                     el.slot,
                 )
             })
-            .collect::<Vec<_>>();
+            .collect::<SmallVec<[_; 16]>>();
 
         let raster = dx::RasterizerDesc::default()
             .with_fill_mode(dx::FillMode::Solid)
@@ -236,7 +244,7 @@ impl RenderShaderDevice for DxDevice {
                     s.ty,
                 )
             })
-            .collect::<Vec<_>>();
+            .collect::<SmallVec<[_; 4]>>();
 
         for (shader, ty) in shaders.iter() {
             match ty {

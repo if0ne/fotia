@@ -1,3 +1,4 @@
+use smallvec::SmallVec;
 use winit::raw_window_handle::RawWindowHandle;
 
 use crate::{
@@ -13,7 +14,7 @@ use super::{
 
 pub struct Swapchain<D: RenderDevice> {
     raw: D::Swapchain,
-    frames: Vec<SwapchainFrame<Handle<Texture>>>,
+    frames: SmallVec<[SwapchainFrame<Handle<Texture>>; 4]>,
     desc: SwapchainDesc,
 }
 
@@ -44,9 +45,7 @@ impl<D: RenderDevice> RenderSwapchainContext for Context<D> {
         wnd: &RawWindowHandle,
         handle_allocator: &HandleContainer,
     ) -> Self::Swapchain {
-        let handles = (0..desc.frames)
-            .map(|_| handle_allocator.create_texture_handle())
-            .collect::<Vec<_>>();
+        let handles = (0..desc.frames).map(|_| handle_allocator.create_texture_handle());
 
         let mut raw = self
             .gpu
@@ -54,15 +53,16 @@ impl<D: RenderDevice> RenderSwapchainContext for Context<D> {
 
         let frames = raw.drain_frames();
 
-        for (frame, handle) in frames.into_iter().zip(handles.iter()) {
-            self.mapper.textures.lock().set(*handle, frame.texture);
-        }
-
-        let frames = handles
+        let frames = frames
             .into_iter()
-            .map(|h| SwapchainFrame {
-                texture: h,
-                last_access: 0,
+            .zip(handles)
+            .map(|(frame, handle)| {
+                self.mapper.textures.lock().set(handle, frame.texture);
+
+                SwapchainFrame {
+                    texture: handle,
+                    last_access: 0,
+                }
             })
             .collect();
 
@@ -85,21 +85,20 @@ impl<D: RenderDevice> RenderSwapchainContext for Context<D> {
 
         self.gpu.resize(&mut swapchain.raw, extent);
 
-        let handles = (0..swapchain.desc.frames)
-            .map(|_| handle_allocator.create_texture_handle())
-            .collect::<Vec<_>>();
+        let handles = (0..swapchain.desc.frames).map(|_| handle_allocator.create_texture_handle());
 
         let frames = swapchain.raw.drain_frames();
 
-        for (frame, handle) in frames.into_iter().zip(handles.iter()) {
-            self.mapper.textures.lock().set(*handle, frame.texture);
-        }
-
-        let frames = handles
+        let frames = frames
             .into_iter()
-            .map(|h| SwapchainFrame {
-                texture: h,
-                last_access: 0,
+            .zip(handles)
+            .map(|(frame, handle)| {
+                self.mapper.textures.lock().set(handle, frame.texture);
+
+                SwapchainFrame {
+                    texture: handle,
+                    last_access: 0,
+                }
             })
             .collect();
 

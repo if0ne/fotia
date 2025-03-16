@@ -2,6 +2,7 @@ use std::num::NonZero;
 
 use oxidx::dx::{self, IDevice, IFactory4, ISwapchain1, ISwapchain3};
 use parking_lot::Mutex;
+use smallvec::SmallVec;
 use winit::raw_window_handle::RawWindowHandle;
 
 use crate::rhi::{
@@ -20,7 +21,7 @@ use super::{
 pub struct Swapchain {
     raw: dx::Swapchain3,
     _hwnd: NonZero<isize>,
-    resources: Vec<SwapchainFrame<DxTexture>>,
+    resources: SmallVec<[SwapchainFrame<DxTexture>; 4]>,
     desc: SwapchainDesc,
 }
 
@@ -58,7 +59,7 @@ impl RenderSwapchainDevice for DxDevice {
         let mut swapchain = Self::Swapchain {
             raw: swapchain.try_into().expect("failed to cast to Swapchain3"),
             _hwnd: hwnd,
-            resources: vec![],
+            resources: SmallVec::new(),
             desc,
         };
         self.resize(&mut swapchain, [width, height]);
@@ -148,8 +149,8 @@ impl RenderSwapchainDevice for DxDevice {
 impl Surface for Swapchain {
     type Texture = DxTexture;
 
-    fn drain_frames(&mut self) -> Vec<SwapchainFrame<Self::Texture>> {
-        self.resources.drain(..).collect()
+    fn drain_frames(&mut self) -> impl Iterator<Item = SwapchainFrame<Self::Texture>> {
+        self.resources.drain(..)
     }
 
     fn next_frame_index(&mut self) -> usize {

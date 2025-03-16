@@ -81,11 +81,11 @@ pub trait RenderCommandBuffer {
 
     fn begin(&mut self, device: &Self::Device);
 
-    fn set_barriers(&mut self, barriers: &[Barrier<'_, Self::Device>]);
+    fn set_barriers<'a>(&mut self, barriers: impl IntoIterator<Item = Barrier<'a, Self::Device>>);
 
-    fn render(
+    fn render<'a>(
         &mut self,
-        targets: &[&<Self::Device as RenderResourceDevice>::Texture],
+        targets: impl IntoIterator<Item = &'a <Self::Device as RenderResourceDevice>::Texture>,
         depth: Option<&<Self::Device as RenderResourceDevice>::Texture>,
     ) -> Self::RenderEncoder<'_>;
 }

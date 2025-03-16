@@ -205,21 +205,18 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
         let buffers = self.mapper.buffers.lock();
         let textures = self.mapper.textures.lock();
 
-        let barriers = barriers
-            .iter()
-            .map(|b| match b {
-                Barrier::Buffer(handle, resource_state) => rhi::command::Barrier::Buffer(
-                    buffers.get(*handle).expect("failed to get buffer"),
-                    *resource_state,
-                ),
-                Barrier::Texture(handle, resource_state) => rhi::command::Barrier::Texture(
-                    textures.get(*handle).expect("failed to get buffer"),
-                    *resource_state,
-                ),
-            })
-            .collect::<Vec<_>>();
+        let barriers = barriers.iter().map(|b| match b {
+            Barrier::Buffer(handle, resource_state) => rhi::command::Barrier::Buffer(
+                buffers.get(*handle).expect("failed to get buffer"),
+                *resource_state,
+            ),
+            Barrier::Texture(handle, resource_state) => rhi::command::Barrier::Texture(
+                textures.get(*handle).expect("failed to get buffer"),
+                *resource_state,
+            ),
+        });
 
-        self.raw.set_barriers(&barriers);
+        self.raw.set_barriers(barriers);
     }
 
     fn render(
@@ -230,11 +227,10 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
         let guard = self.mapper.textures.lock();
         let targets = targets
             .iter()
-            .map(|h| guard.get(*h).expect("failed to get texture"))
-            .collect::<Vec<_>>();
+            .map(|h| guard.get(*h).expect("failed to get texture"));
         let depth = depth.map(|h| guard.get(h).expect("failed to get texture"));
 
-        let raw = self.raw.render(&targets, depth);
+        let raw = self.raw.render(targets, depth);
 
         Self::RenderEncoder {
             raw,

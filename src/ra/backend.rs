@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::rhi::{
     backend::{Api, RenderDeviceId, RenderDeviceInfo},
     shader::{CompiledShader, ShaderDesc},
@@ -28,7 +30,7 @@ impl<A: Api<Device: RenderDevice>> Api for Backend<A> {
         Context::new(gpu)
     }
 
-    fn compile_shader(&self, desc: &ShaderDesc) -> CompiledShader {
+    fn compile_shader<P: AsRef<Path>>(&self, desc: &ShaderDesc<'_, P>) -> CompiledShader {
         self.api.compile_shader(desc)
     }
 }

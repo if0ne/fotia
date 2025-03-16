@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{borrow::Cow, path::Path};
 
 use super::{
     resources::RenderResourceDevice,
@@ -20,9 +20,13 @@ pub trait RenderShaderDevice: RenderResourceDevice {
     fn create_pipeline_layout(&self, desc: PipelineLayoutDesc<'_>) -> Self::PipelineLayout;
     fn destroy_pipeline_layout(&self, layout: Self::PipelineLayout);
 
-    fn create_shader_argument(
+    fn create_shader_argument<
+        'a,
+        V: IntoIterator<Item = ShaderEntry<'a, Self>>,
+        S: IntoIterator<Item = &'a Self::Sampler>,
+    >(
         &self,
-        desc: ShaderArgumentDesc<'_, '_, Self>,
+        desc: ShaderArgumentDesc<'a, Self, V, S>,
     ) -> Self::ShaderArgument;
 
     fn destroy_shader_argument(&self, argument: Self::ShaderArgument);
@@ -77,48 +81,24 @@ pub enum ShaderEntry<'a, D: RenderResourceDevice> {
 }
 
 #[derive(Clone, Debug)]
-pub struct ShaderArgumentDesc<'a, 'b, D: RenderResourceDevice> {
-    pub views: &'a [ShaderEntry<'b, D>],
-    pub samplers: &'a [&'b D::Sampler],
-    pub dynamic_buffer: Option<&'b D::Buffer>,
+pub struct ShaderArgumentDesc<
+    'a,
+    D: RenderResourceDevice,
+    V: IntoIterator<Item = ShaderEntry<'a, D>>,
+    S: IntoIterator<Item = &'a D::Sampler>,
+> {
+    pub views: V,
+    pub samplers: S,
+    pub dynamic_buffer: Option<&'a D::Buffer>,
 }
 
-#[derive(Clone, Debug, Eq)]
-pub struct ShaderDesc {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ShaderDesc<'a, P: AsRef<Path>> {
     pub ty: ShaderType,
-    pub path: PathBuf,
-    pub entry_point: String,
+    pub path: P,
+    pub entry_point: Cow<'a, str>,
     pub debug: bool,
-    pub defines: Vec<(String, String)>,
-}
-
-impl std::hash::Hash for ShaderDesc {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        let mut set: HashSet<&(String, String)> = HashSet::new();
-        for pair in &self.defines {
-            set.insert(pair);
-        }
-
-        let mut sorted: Vec<_> = set.iter().collect();
-        sorted.sort_by(|a, b| a.cmp(b));
-
-        for pair in sorted {
-            pair.hash(state);
-        }
-    }
-}
-
-impl PartialEq for ShaderDesc {
-    fn eq(&self, other: &Self) -> bool {
-        let set_self: HashSet<_> = self.defines.iter().collect();
-        let set_other: HashSet<_> = other.defines.iter().collect();
-
-        self.ty == other.ty
-            && self.path == other.path
-            && self.entry_point == other.entry_point
-            && self.debug == other.debug
-            && set_self == set_other
-    }
+    pub defines: Vec<(Cow<'a, str>, Cow<'a, str>)>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

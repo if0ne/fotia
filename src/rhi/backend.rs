@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use super::shader::{CompiledShader, ShaderDesc};
 
 pub type RenderDeviceId = usize;
@@ -8,7 +10,7 @@ pub trait Api {
     fn enumerate_devices(&self) -> impl Iterator<Item = &RenderDeviceInfo> + '_;
     fn create_device(&self, index: RenderDeviceId) -> Self::Device;
 
-    fn compile_shader(&self, desc: &ShaderDesc) -> CompiledShader;
+    fn compile_shader<P: AsRef<Path>>(&self, desc: &ShaderDesc<'_, P>) -> CompiledShader;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

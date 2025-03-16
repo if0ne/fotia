@@ -1,9 +1,10 @@
-use std::ffi::CString;
+use std::{ffi::CString, path::Path};
 
 use oxidx::dx::{
     self, IAdapter3, IBlob, IBlobExt, IDebug, IDebug1, IDebugExt, IDevice, IFactory4, IFactory6,
     features::{Architecture1Feature, OptionsFeature},
 };
+use smallvec::SmallVec;
 use tracing::{debug, error, info, warn};
 
 use crate::rhi::{
@@ -195,7 +196,7 @@ impl Api for DxBackend {
         )
     }
 
-    fn compile_shader(&self, desc: &ShaderDesc) -> CompiledShader {
+    fn compile_shader<P: AsRef<Path>>(&self, desc: &ShaderDesc<'_, P>) -> CompiledShader {
         let target = match desc.ty {
             ShaderType::Vertex => c"vs_5_1",
             ShaderType::Pixel => c"ps_5_1",
@@ -216,13 +217,13 @@ impl Api for DxBackend {
                     CString::new(v.as_bytes()).expect("CString::new failed"),
                 )
             })
-            .collect::<Vec<_>>();
+            .collect::<SmallVec<[_; 4]>>();
 
         let defines = defines
             .iter()
             .map(|(k, v)| dx::ShaderMacro::new(k, v))
             .chain(std::iter::once(dx::ShaderMacro::default()))
-            .collect::<Vec<_>>();
+            .collect::<SmallVec<[_; 4]>>();
 
         let entry_point = CString::new(desc.entry_point.as_bytes()).expect("CString::new failed");
 

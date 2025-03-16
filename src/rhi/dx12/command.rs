@@ -8,6 +8,7 @@ use oxidx::dx::{
     IGraphicsCommandListExt, IResource, PSO_NONE,
 };
 use parking_lot::Mutex;
+use smallvec::SmallVec;
 
 use crate::rhi::{
     command::{
@@ -227,7 +228,7 @@ impl RenderCommandQueue for DxCommandQueue {
         let lists = cmd_buffers
             .iter()
             .map(|b| Some(b.list.clone()))
-            .collect::<Vec<_>>();
+            .collect::<SmallVec<[_; 16]>>();
 
         self.queue.lock().execute_command_lists(&lists);
         let fence_value = self.signal_event(&self.fence);
@@ -299,12 +300,12 @@ impl RenderCommandBuffer for DxCommandBuffer {
         ]);
     }
 
-    fn set_barriers(&mut self, barriers: &[Barrier<'_, Self::Device>]) {
+    fn set_barriers<'a>(&mut self, barriers: impl IntoIterator<Item = Barrier<'a, Self::Device>>) {
         let barriers = barriers
-            .iter()
+            .into_iter()
             .filter_map(|b| match b {
                 Barrier::Buffer(buffer, resource_state) => {
-                    let new_state = map_resource_state(*resource_state);
+                    let new_state = map_resource_state(resource_state);
                     let old_state = std::mem::replace(&mut *buffer.state.lock(), new_state);
 
                     if old_state != new_state {
@@ -319,7 +320,7 @@ impl RenderCommandBuffer for DxCommandBuffer {
                     }
                 }
                 Barrier::Texture(texture, resource_state) => {
-                    let new_state = map_resource_state(*resource_state);
+                    let new_state = map_resource_state(resource_state);
                     let old_state = std::mem::replace(&mut *texture.state.lock(), new_state);
 
                     if old_state != new_state {
@@ -334,22 +335,22 @@ impl RenderCommandBuffer for DxCommandBuffer {
                     }
                 }
             })
-            .collect::<Vec<_>>();
+            .collect::<SmallVec<[_; 8]>>();
 
         if !barriers.is_empty() {
             self.list.resource_barrier(&barriers);
         }
     }
 
-    fn render(
+    fn render<'a>(
         &mut self,
-        targets: &[&DxTexture],
-        depth: Option<&DxTexture>,
+        targets: impl IntoIterator<Item = &'a <Self::Device as RenderResourceDevice>::Texture>,
+        depth: Option<&<Self::Device as RenderResourceDevice>::Texture>,
     ) -> Self::RenderEncoder<'_> {
         let targets = targets
-            .iter()
+            .into_iter()
             .filter_map(|t| t.descriptor.as_ref().map(|d| d.cpu))
-            .collect::<Vec<_>>();
+            .collect::<SmallVec<[_; 8]>>();
 
         let depth = depth.and_then(|t| t.descriptor.as_ref()).map(|d| d.cpu);
 

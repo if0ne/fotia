@@ -528,6 +528,7 @@ dependencies = [
  "oxidx",
  "parking_lot",
  "range-alloc",
+ "smallvec",
  "tracing",
  "tracing-subscriber",
  "winit",

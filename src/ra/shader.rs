@@ -54,36 +54,31 @@ impl<D: RenderDevice> RenderShaderContext for Context<D> {
         let textures = self.mapper.textures.lock();
         let samplers = self.mapper.samplers.lock();
 
-        let views = desc
-            .views
-            .iter()
-            .map(|e| match e {
-                ShaderEntry::Cbv(handle, size) => rhi::shader::ShaderEntry::Cbv(
-                    buffers.get(*handle).expect("failed to get buffer"),
-                    *size,
-                ),
-                ShaderEntry::Srv(handle) => rhi::shader::ShaderEntry::Srv(
-                    textures.get(*handle).expect("failed to get texture"),
-                ),
-                ShaderEntry::Uav(handle) => rhi::shader::ShaderEntry::Uav(
-                    textures.get(*handle).expect("failed to get texture"),
-                ),
-            })
-            .collect::<Vec<_>>();
+        let views = desc.views.iter().map(|e| match e {
+            ShaderEntry::Cbv(handle, size) => rhi::shader::ShaderEntry::Cbv(
+                buffers.get(*handle).expect("failed to get buffer"),
+                *size,
+            ),
+            ShaderEntry::Srv(handle) => {
+                rhi::shader::ShaderEntry::Srv(textures.get(*handle).expect("failed to get texture"))
+            }
+            ShaderEntry::Uav(handle) => {
+                rhi::shader::ShaderEntry::Uav(textures.get(*handle).expect("failed to get texture"))
+            }
+        });
 
         let samplers = desc
             .samplers
             .iter()
-            .map(|s| samplers.get(*s).expect("failed to get sampler"))
-            .collect::<Vec<_>>();
+            .map(|s| samplers.get(*s).expect("failed to get sampler"));
 
         let dynamic_buffer = desc
             .dynamic_buffer
             .map(|b| buffers.get(b).expect("failed to get buffer"));
 
         let desc = rhi::shader::ShaderArgumentDesc {
-            views: &views,
-            samplers: &samplers,
+            views,
+            samplers,
             dynamic_buffer,
         };
 

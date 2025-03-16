@@ -3,9 +3,9 @@ use std::{borrow::Cow, fmt::Debug, ops::Range};
 use super::types::{AddressMode, Filter, Format};
 
 pub trait RenderResourceDevice: Sized {
-    type Buffer: Debug;
-    type Texture: Debug;
-    type Sampler: Debug;
+    type Buffer: Debug + 'static;
+    type Texture: Debug + 'static;
+    type Sampler: Debug + 'static;
 
     fn create_buffer(&self, desc: BufferDesc) -> Self::Buffer;
     fn destroy_buffer(&self, buffer: Self::Buffer);

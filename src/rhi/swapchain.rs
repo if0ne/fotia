@@ -38,7 +38,7 @@ pub trait RenderSwapchainDevice {
 pub trait Surface {
     type Texture;
 
-    fn drain_frames(&mut self) -> Vec<SwapchainFrame<Self::Texture>>;
+    fn drain_frames(&mut self) -> impl Iterator<Item = SwapchainFrame<Self::Texture>>;
     fn next_frame_index(&mut self) -> usize;
     fn next_frame(&mut self) -> &mut SwapchainFrame<Self::Texture>;
     fn present(&self);
