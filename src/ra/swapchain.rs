@@ -1,3 +1,5 @@
+use winit::raw_window_handle::RawWindowHandle;
+
 use crate::{
     collections::handle::Handle,
     rhi::swapchain::{Surface as _, SwapchainDesc, SwapchainFrame},
@@ -17,12 +19,11 @@ pub struct Swapchain<D: RenderDevice> {
 
 pub trait RenderSwapchainContext {
     type Swapchain;
-    type Wnd;
 
     fn create_swapchain(
         &self,
         desc: SwapchainDesc,
-        wnd: &Self::Wnd,
+        wnd: &RawWindowHandle,
         handle_allocator: &HandleContainer,
     ) -> Self::Swapchain;
     fn resize(
@@ -36,12 +37,11 @@ pub trait RenderSwapchainContext {
 
 impl<D: RenderDevice> RenderSwapchainContext for Context<D> {
     type Swapchain = Swapchain<D>;
-    type Wnd = D::Wnd;
 
     fn create_swapchain(
         &self,
         desc: SwapchainDesc,
-        wnd: &Self::Wnd,
+        wnd: &RawWindowHandle,
         handle_allocator: &HandleContainer,
     ) -> Self::Swapchain {
         let handles = (0..desc.frames)
@@ -76,6 +76,10 @@ impl<D: RenderDevice> RenderSwapchainContext for Context<D> {
         handle_allocator: &HandleContainer,
     ) {
         for frame in swapchain.frames.drain(..) {
+            if let Some(texture) = self.mapper.textures.lock().remove(frame.texture) {
+                self.gpu.destroy_swapchain_image(texture);
+            };
+
             handle_allocator.free_texture_handle(frame.texture);
         }
 

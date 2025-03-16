@@ -1,19 +1,14 @@
-use std::path::PathBuf;
-
 use ra::{
-    command::{RenderCommandContext, RenderCommandEncoder, RenderEncoder},
-    context::ContextDual,
-    resources::RenderResourceContext,
-    shader::{RenderShaderContext, ShaderArgumentDesc, ShaderEntry},
+    context::{ContextDual, RenderDevice},
+    swapchain::{RenderSwapchainContext, Swapchain},
     system::{RenderBackend, RenderBackendSettings, RenderSystem},
 };
 use rhi::{
     backend::{Api, DebugFlags},
-    resources::{TextureUsages, TextureViewDesc, TextureViewType},
-    shader::BindingSet,
-    types::{CullMode, Format, InputElementDesc, ShaderType, VertexAttribute, VertexType},
+    swapchain::{PresentMode, SwapchainDesc},
 };
 use tracing_subscriber::layer::SubscriberExt;
+use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 pub mod collections;
 pub mod ra;
@@ -34,153 +29,122 @@ fn main() {
     let backend = rs.dx_backend().expect("failed to get directx backend");
 
     let primary = backend.create_device(0);
-    let secondary = backend.create_device(2);
+    let secondary = backend.create_device(1);
 
     let group = ContextDual::new(primary, secondary);
 
-    let image = image::open("../assets/texture.jpg")
-        .expect("failed to load image")
-        .to_rgba8();
-    let bytes = image.as_raw();
+    let event_loop = winit::event_loop::EventLoop::new().expect("failed to create event loop");
 
-    let texture = rs.create_texture_handle();
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
-    group.call(|ctx| {
-        ctx.bind_texture(
-            texture,
-            rhi::resources::TextureDesc::new_2d(
-                [image.width(), image.height()],
-                Format::Rgba8,
-                TextureUsages::Resource,
-            ),
-            Some(&bytes),
-        );
+    let mut app = Application {
+        rs,
+        context: group,
+        wnd_ctx: None,
+    };
 
-        ctx.unbind_texture(texture);
-    });
+    event_loop.run_app(&mut app).expect("failed to run app");
+}
 
-    let layout = rs.create_pipeline_layout_handle();
-    let pipeline = rs.create_raster_pipeline_handle();
+pub struct WindowContext<D: RenderDevice> {
+    pub window: winit::window::Window,
+    pub wnd: RawWindowHandle,
+    pub swapchain: Swapchain<D>,
+}
 
-    let vs = backend.compile_shader(rhi::shader::ShaderDesc {
-        ty: ShaderType::Vertex,
-        path: PathBuf::from("../assets/test.hlsl"),
-        entry_point: "Main".to_string(),
-        debug: true,
-        defines: vec![],
-    });
+pub struct Application<D: RenderDevice> {
+    pub wnd_ctx: Option<WindowContext<D>>,
+    pub rs: RenderSystem,
+    pub context: ContextDual<D>,
+}
 
-    group.call_primary(|ctx| {
-        ctx.bind_pipeline_layout(
-            layout,
-            rhi::shader::PipelineLayoutDesc {
-                sets: &[BindingSet {
-                    entries: &[],
-                    use_dynamic_buffer: true,
-                }],
-                static_samplers: &[],
+impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let window_attributes = winit::window::Window::default_attributes()
+            .with_title("Hello, Window!")
+            .with_inner_size(winit::dpi::PhysicalSize::new(800, 600));
+
+        let window = event_loop.create_window(window_attributes).unwrap();
+        /*window
+            .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+            .expect("failed to lock cursor");
+        window.set_cursor_visible(false);*/
+
+        let wnd = window
+            .window_handle()
+            .map(|h| h.as_raw())
+            .expect("failed to get window handle");
+
+        let swapchain = self.context.primary.create_swapchain(
+            SwapchainDesc {
+                width: 800,
+                height: 600,
+                present_mode: PresentMode::Mailbox,
+                frames: 3,
             },
+            &wnd,
+            &self.rs.handles,
         );
 
-        ctx.bind_raster_pipeline(
-            pipeline,
-            ra::shader::RasterPipelineDesc {
-                layout: Some(layout),
-                input_elements: &[InputElementDesc {
-                    semantic: VertexAttribute::Position(0),
-                    format: VertexType::Float3,
-                    slot: 0,
-                }],
-                depth_bias: 0,
-                slope_bias: 0.0,
-                depth_clip: false,
-                depth: None,
-                render_targets: &[Format::Rgba8],
-                cull_mode: CullMode::None,
-                vs: &vs,
-                shaders: &[],
+        self.wnd_ctx = Some(WindowContext {
+            window,
+            wnd,
+            swapchain,
+        });
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: winit::event::WindowEvent,
+    ) {
+        match event {
+            winit::event::WindowEvent::Focused(_) => {}
+            winit::event::WindowEvent::KeyboardInput { event, .. } => match event.state {
+                winit::event::ElementState::Pressed => {
+                    if event.physical_key == winit::keyboard::KeyCode::Escape {
+                        event_loop.exit();
+                    }
+                }
+                winit::event::ElementState::Released => {}
             },
-        );
-
-        ctx.unbind_pipeline_layout(layout);
-        ctx.unbind_raster_pipeline(pipeline);
-    });
-
-    let diffuse = rs.create_texture_handle();
-    let normal = rs.create_texture_handle();
-    let material = rs.create_texture_handle();
-
-    let diffuse_srv = rs.create_texture_handle();
-    let normal_srv = rs.create_texture_handle();
-    let material_srv = rs.create_texture_handle();
-
-    let light_pass_argument = rs.create_shader_argument_handle();
-
-    group.call(|ctx| {
-        ctx.bind_texture(
-            diffuse,
-            rhi::resources::TextureDesc::new_2d(
-                [1920, 1080],
-                Format::Rgba32,
-                TextureUsages::RenderTarget | TextureUsages::Resource,
-            ),
-            None,
-        );
-
-        ctx.bind_texture(
-            normal,
-            rhi::resources::TextureDesc::new_2d(
-                [1920, 1080],
-                Format::Rgba32,
-                TextureUsages::RenderTarget | TextureUsages::Resource,
-            ),
-            None,
-        );
-
-        ctx.bind_texture(
-            material,
-            rhi::resources::TextureDesc::new_2d(
-                [1920, 1080],
-                Format::Rgba32,
-                TextureUsages::RenderTarget | TextureUsages::Resource,
-            ),
-            None,
-        );
-
-        ctx.bind_texture_view(
-            diffuse_srv,
-            diffuse,
-            TextureViewDesc::default().with_view_type(TextureViewType::ShaderResource),
-        );
-
-        ctx.bind_texture_view(
-            normal_srv,
-            normal,
-            TextureViewDesc::default().with_view_type(TextureViewType::ShaderResource),
-        );
-
-        ctx.bind_texture_view(
-            material_srv,
-            material,
-            TextureViewDesc::default().with_view_type(TextureViewType::ShaderResource),
-        );
-
-        ctx.bind_shader_argument(
-            light_pass_argument,
-            ShaderArgumentDesc {
-                views: &[
-                    ShaderEntry::Srv(diffuse_srv),
-                    ShaderEntry::Srv(normal_srv),
-                    ShaderEntry::Srv(material_srv),
-                ],
-                samplers: &[],
-                dynamic_buffer: None,
+            winit::event::WindowEvent::MouseInput { state, .. } => match state {
+                winit::event::ElementState::Pressed => {}
+                winit::event::ElementState::Released => {}
             },
-        );
+            winit::event::WindowEvent::Resized(size) => {
+                if let Some(window) = self.wnd_ctx.as_mut() {
+                    self.context.primary.wait_idle();
+                    self.context.primary.resize(
+                        &mut window.swapchain,
+                        [size.width, size.height],
+                        &self.rs.handles,
+                    );
+                }
+            }
+            winit::event::WindowEvent::RedrawRequested => {}
+            winit::event::WindowEvent::CloseRequested => event_loop.exit(),
+            _ => (),
+        }
+    }
 
-        let mut cmd = ctx.create_encoder(rhi::command::CommandType::Graphics);
+    #[allow(clippy::single_match)]
+    fn device_event(
+        &mut self,
+        _: &winit::event_loop::ActiveEventLoop,
+        _: winit::event::DeviceId,
+        event: winit::event::DeviceEvent,
+    ) {
+        match event {
+            winit::event::DeviceEvent::MouseMotion { .. } => {}
+            _ => {}
+        }
+    }
 
-        let mut encoder = cmd.render(&[diffuse, normal, material], None);
-        encoder.draw(3, 0);
-    });
+    fn about_to_wait(&mut self, _: &winit::event_loop::ActiveEventLoop) {
+        if let Some(context) = self.wnd_ctx.as_ref() {
+            context.window.request_redraw();
+        }
+    }
 }

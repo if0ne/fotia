@@ -14,9 +14,9 @@ use super::{
 
 #[derive(Debug)]
 pub struct RenderSystem {
-    pub(super) handles: HandleContainer,
-
     pub(super) dx_backend: Option<Arc<Backend<DxBackend>>>,
+
+    pub handles: HandleContainer,
 }
 
 impl RenderSystem {

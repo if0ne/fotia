@@ -2,6 +2,7 @@ use std::num::NonZero;
 
 use oxidx::dx::{self, IDevice, IFactory4, ISwapchain1, ISwapchain3};
 use parking_lot::Mutex;
+use winit::raw_window_handle::RawWindowHandle;
 
 use crate::rhi::{
     resources::{TextureDesc, TextureType, TextureUsages, TextureViewDesc, TextureViewType},
@@ -25,13 +26,12 @@ pub struct Swapchain {
 
 impl RenderSwapchainDevice for DxDevice {
     type Swapchain = Swapchain;
-    type Wnd = NonZero<isize>;
     type Queue = DxCommandQueue;
 
     fn create_swapchain(
         &self,
         desc: SwapchainDesc,
-        wnd: &Self::Wnd,
+        wnd: &RawWindowHandle,
         queue: &Self::Queue,
     ) -> Self::Swapchain {
         let width = desc.width;
@@ -45,14 +45,19 @@ impl RenderSwapchainDevice for DxDevice {
             .with_swap_effect(dx::SwapEffect::FlipDiscard)
             .with_flags(dx::SwapchainFlags::AllowTearing);
 
+        let RawWindowHandle::Win32(hwnd) = wnd else {
+            unreachable!()
+        };
+        let hwnd = hwnd.hwnd;
+
         let swapchain = self
             .factory
-            .create_swapchain_for_hwnd(&*queue.queue.lock(), *wnd, &raw_desc, None, dx::OUTPUT_NONE)
+            .create_swapchain_for_hwnd(&*queue.queue.lock(), hwnd, &raw_desc, None, dx::OUTPUT_NONE)
             .expect("failed to create swapchain");
 
         let mut swapchain = Self::Swapchain {
             raw: swapchain.try_into().expect("failed to cast to Swapchain3"),
-            _hwnd: *wnd,
+            _hwnd: hwnd,
             resources: vec![],
             desc,
         };
@@ -118,6 +123,12 @@ impl RenderSwapchainDevice for DxDevice {
                 texture,
                 last_access: 0,
             });
+        }
+    }
+
+    fn destroy_swapchain_image(&self, image: <Self::Swapchain as Surface>::Texture) {
+        if let Some(descriptor) = image.descriptor {
+            self.descriptors.free(descriptor);
         }
     }
 
