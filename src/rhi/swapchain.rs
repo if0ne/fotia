@@ -1,4 +1,4 @@
-use super::command::RenderCommandDevice;
+use super::command::SyncPoint;
 
 #[derive(Clone, Debug)]
 pub enum PresentMode {
@@ -33,8 +33,16 @@ pub trait RenderSwapchainDevice {
 }
 
 pub trait Surface {
-    type Frame;
+    type Texture;
 
-    fn next_frame(&mut self) -> &Self::Frame;
+    fn drain_frames(&mut self) -> Vec<SwapchainFrame<Self::Texture>>;
+    fn next_frame_index(&mut self) -> usize;
+    fn next_frame(&mut self) -> &SwapchainFrame<Self::Texture>;
     fn present(&self);
+}
+
+#[derive(Debug)]
+pub struct SwapchainFrame<T> {
+    pub texture: T,
+    pub last_access: SyncPoint,
 }

@@ -4,9 +4,8 @@ use oxidx::dx::{self, IDevice, IFactory4, ISwapchain1, ISwapchain3};
 use parking_lot::Mutex;
 
 use crate::rhi::{
-    command::SyncPoint,
     resources::{TextureDesc, TextureType, TextureUsages, TextureViewDesc, TextureViewType},
-    swapchain::{PresentMode, RenderSwapchainDevice, Surface, SwapchainDesc},
+    swapchain::{PresentMode, RenderSwapchainDevice, Surface, SwapchainDesc, SwapchainFrame},
     types::Format,
 };
 
@@ -17,16 +16,10 @@ use super::{
 };
 
 #[derive(Debug)]
-pub struct SwapchainFrame {
-    pub texture: DxTexture,
-    pub last_access: SyncPoint,
-}
-
-#[derive(Debug)]
 pub struct Swapchain {
     raw: dx::Swapchain3,
     _hwnd: NonZero<isize>,
-    resources: Vec<SwapchainFrame>,
+    resources: Vec<SwapchainFrame<DxTexture>>,
     desc: SwapchainDesc,
 }
 
@@ -142,9 +135,17 @@ impl RenderSwapchainDevice for DxDevice {
 }
 
 impl Surface for Swapchain {
-    type Frame = SwapchainFrame;
+    type Texture = DxTexture;
 
-    fn next_frame(&mut self) -> &Self::Frame {
+    fn drain_frames(&mut self) -> Vec<SwapchainFrame<Self::Texture>> {
+        self.resources.drain(..).collect()
+    }
+
+    fn next_frame_index(&mut self) -> usize {
+        self.raw.get_current_back_buffer_index() as usize
+    }
+
+    fn next_frame(&mut self) -> &SwapchainFrame<Self::Texture> {
         let next_idx = self.raw.get_current_back_buffer_index() as usize;
         &self.resources[next_idx]
     }
