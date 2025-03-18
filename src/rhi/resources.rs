@@ -1,11 +1,19 @@
 use std::{borrow::Cow, fmt::Debug, ops::Range};
 
-use super::types::{AddressMode, Filter, Format};
+use super::{
+    command::CommandType,
+    types::{AddressMode, Filter, Format},
+};
+
+pub trait QueryHeap {
+    fn read_buffer(&self) -> &[u8];
+}
 
 pub trait RenderResourceDevice: Sized {
     type Buffer: Debug + 'static;
     type Texture: Debug + 'static;
     type Sampler: Debug + 'static;
+    type TimestampQuery: QueryHeap + Debug + 'static;
 
     fn create_buffer(&self, desc: BufferDesc) -> Self::Buffer;
     fn destroy_buffer(&self, buffer: Self::Buffer);
@@ -19,6 +27,9 @@ pub trait RenderResourceDevice: Sized {
 
     fn create_sampler(&self, desc: SamplerDesc) -> Self::Sampler;
     fn destroy_sampler(&self, sampler: Self::Sampler);
+
+    fn create_timestamp_query(&self, ty: CommandType, size: usize) -> Self::TimestampQuery;
+    fn destroy_timestamp_query(&self, query: Self::TimestampQuery);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

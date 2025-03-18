@@ -154,6 +154,8 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                 self.context.call_primary(|ctx| {
                     ctx.wait_on_cpu(CommandType::Graphics, frame.last_access);
                     let mut encoder = ctx.create_encoder(CommandType::Graphics);
+                    let timings = encoder.begin(ctx);
+                    dbg!(&timings);
 
                     encoder.set_barriers(&[Barrier::Texture(
                         frame.texture,
@@ -164,8 +166,11 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                         encoder.clear_rt(frame.texture, [0.5, 0.32, 0.16, 1.0]);
                     }
 
+                    encoder.begin_timestamp();
+
                     encoder
                         .set_barriers(&[Barrier::Texture(frame.texture, ResourceState::Present)]);
+                    encoder.end_timestamp();
 
                     ctx.commit(encoder);
                     frame.last_access = ctx.submit(CommandType::Graphics);

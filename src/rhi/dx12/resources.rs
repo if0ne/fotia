@@ -4,10 +4,11 @@ use oxidx::dx::{self, IDevice, IDeviceChildExt, IResource};
 use parking_lot::{Mutex, MutexGuard};
 
 use crate::rhi::{
+    command::CommandType,
     dx12::conv::map_texture_desc,
     resources::{
-        BufferDesc, BufferUsages, MemoryLocation, RenderResourceDevice, SamplerDesc, TextureDesc,
-        TextureType, TextureUsages, TextureViewDesc, TextureViewType,
+        BufferDesc, BufferUsages, MemoryLocation, QueryHeap, RenderResourceDevice, SamplerDesc,
+        TextureDesc, TextureType, TextureUsages, TextureViewDesc, TextureViewType,
     },
 };
 
@@ -20,6 +21,7 @@ impl RenderResourceDevice for DxDevice {
     type Buffer = DxBuffer;
     type Texture = DxTexture;
     type Sampler = DxSampler;
+    type TimestampQuery = DxTimestampQuery;
 
     fn create_buffer(&self, desc: BufferDesc) -> Self::Buffer {
         let heap_props = match desc.memory_location {
@@ -189,6 +191,33 @@ impl RenderResourceDevice for DxDevice {
     }
 
     fn destroy_sampler(&self, _sampler: Self::Sampler) {}
+
+    fn create_timestamp_query(&self, ty: CommandType, size: usize) -> Self::TimestampQuery {
+        let raw = match ty {
+            CommandType::Graphics | CommandType::Compute => self
+                .gpu
+                .create_query_heap(&dx::QueryHeapDesc::timestamp(2 * size))
+                .expect("failed to create timestamp query"),
+            CommandType::Transfer => self
+                .gpu
+                .create_query_heap(&dx::QueryHeapDesc::copy_queue_timestamp(2 * size))
+                .expect("failed to create timestamp query"),
+        };
+
+        let buffer = self.create_buffer(BufferDesc::gpu_to_cpu(
+            2 * size * size_of::<u64>(),
+            BufferUsages::QueryResolve,
+        ));
+
+        DxTimestampQuery {
+            raw,
+            buffer,
+            _size: size,
+            cur_index: 0,
+        }
+    }
+
+    fn destroy_timestamp_query(&self, _query: Self::TimestampQuery) {}
 }
 
 #[derive(Debug)]
@@ -706,4 +735,19 @@ impl DxDevice {
 #[derive(Debug)]
 pub struct DxSampler {
     pub(super) desc: dx::SamplerDesc,
+}
+
+#[derive(Debug)]
+pub struct DxTimestampQuery {
+    pub(super) raw: dx::QueryHeap,
+    pub(super) buffer: DxBuffer,
+    pub(super) _size: usize,
+    pub(super) cur_index: usize,
+}
+
+impl QueryHeap for DxTimestampQuery {
+    fn read_buffer(&self) -> &[u8] {
+        let map = self.buffer.map();
+        map.pointer
+    }
 }

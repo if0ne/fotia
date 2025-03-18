@@ -12,8 +12,8 @@ use smallvec::SmallVec;
 
 use crate::rhi::{
     command::{
-        Barrier, CommandType, GpuEvent, IoCommandBuffer, RenderCommandBuffer, RenderCommandDevice,
-        RenderCommandQueue, RenderEncoder, RenderResourceUploader, SyncPoint,
+        Barrier, CommandBufferState, CommandType, GpuEvent, IoCommandBuffer, RenderCommandBuffer,
+        RenderCommandDevice, RenderCommandQueue, RenderEncoder, RenderResourceUploader, SyncPoint,
     },
     resources::{BufferDesc, BufferUsages, MemoryLocation, RenderResourceDevice},
     types::{IndexType, Scissor, Viewport},
@@ -39,10 +39,9 @@ impl RenderCommandDevice for DxDevice {
 
         let fence = self.create_event(false);
 
-        let frequency = 1000.0
-            / queue
-                .get_timestamp_frequency()
-                .expect("failed to fetch timestamp frequency") as f64;
+        let frequency = queue
+            .get_timestamp_frequency()
+            .expect("failed to fetch timestamp frequency") as f64;
 
         let cmd_allocators = (0..3)
             .map(|_| CommandAllocatorEntry {
@@ -66,7 +65,6 @@ impl RenderCommandDevice for DxDevice {
         cmd_list.close().expect("failed to close list");
 
         DxCommandQueue {
-            device: self.gpu.clone(),
             ty_raw: map_command_buffer_type(ty),
             ty,
             fence,
@@ -135,7 +133,6 @@ impl RenderCommandDevice for DxDevice {
 
 #[derive(Debug)]
 pub struct DxCommandQueue {
-    device: dx::Device,
     ty_raw: dx::CommandListType,
     ty: CommandType,
 
@@ -158,11 +155,24 @@ impl RenderCommandQueue for DxCommandQueue {
     type Event = DxFence;
     type CommandBuffer = DxCommandBuffer;
 
-    fn create_command_buffer(&self) -> Self::CommandBuffer {
+    fn ty(&self) -> CommandType {
+        self.ty
+    }
+
+    fn frequency(&self) -> f64 {
+        self.frequency
+    }
+
+    #[allow(unused_assignments)]
+    fn create_command_buffer(
+        &self,
+        device: &Self::Device,
+    ) -> CommandBufferState<Self::CommandBuffer> {
         if let Some(buffer) = self.in_record.lock().pop() {
-            return buffer;
+            return CommandBufferState::Stashed(buffer);
         };
 
+        let mut created = false;
         let allocator = if let Some(allocator) =
             self.cmd_allocators.lock().pop_front().and_then(|a| {
                 if self.fence.get_completed_value() >= a.sync_point {
@@ -171,6 +181,7 @@ impl RenderCommandQueue for DxCommandQueue {
                     None
                 }
             }) {
+            created = false;
             allocator
                 .raw
                 .reset()
@@ -179,14 +190,16 @@ impl RenderCommandQueue for DxCommandQueue {
             allocator
         } else {
             if self.capacity.is_some() {
+                created = false;
                 let entry = self.cmd_allocators.lock().pop_front().expect("unreachable");
                 self.fence.wait(entry.sync_point);
 
                 entry
             } else {
+                created = true;
                 CommandAllocatorEntry {
-                    raw: self
-                        .device
+                    raw: device
+                        .gpu
                         .create_command_allocator(self.ty_raw)
                         .expect("failed to create command allocator"),
                     sync_point: 0,
@@ -199,18 +212,24 @@ impl RenderCommandQueue for DxCommandQueue {
                 .expect("Failed to reset list");
             list
         } else {
-            let list = self
-                .device
+            let list = device
+                .gpu
                 .create_command_list(0, self.ty_raw, &allocator.raw, PSO_NONE)
                 .expect("failed to create command list");
             list.close().expect("failed to close list");
             list
         };
 
-        DxCommandBuffer {
+        let cmd = DxCommandBuffer {
             list,
             allocator,
             ty: self.ty,
+        };
+
+        if created {
+            CommandBufferState::Created(cmd)
+        } else {
+            CommandBufferState::New(cmd)
         }
     }
 
@@ -358,6 +377,41 @@ impl RenderCommandBuffer for DxCommandBuffer {
 
         DxRenderEncoder { cmd: self }
     }
+
+    fn begin_timestamp(
+        &mut self,
+        query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
+    ) {
+        self.list
+            .end_query(&query.raw, dx::QueryType::Timestamp, query.cur_index);
+        query.cur_index += 1;
+    }
+
+    fn end_timestamp(
+        &mut self,
+        query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
+    ) {
+        self.list
+            .end_query(&query.raw, dx::QueryType::Timestamp, query.cur_index);
+        query.cur_index += 1;
+    }
+
+    fn resolve_timestamp_data(
+        &mut self,
+        query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
+    ) -> std::ops::Range<usize> {
+        let range = 0..query.cur_index;
+        self.list.resolve_query_data(
+            &query.raw,
+            dx::QueryType::Timestamp,
+            range.clone(),
+            &query.buffer.raw,
+            0,
+        );
+        query.cur_index = 0;
+
+        range
+    }
 }
 
 #[derive(Debug)]
@@ -379,11 +433,32 @@ impl RenderCommandQueue for DxResourceUploader {
     type Event = DxFence;
     type CommandBuffer = DxIoCommandBuffer;
 
-    fn create_command_buffer(&self) -> Self::CommandBuffer {
-        let buffer = self.queue.create_command_buffer();
+    fn ty(&self) -> CommandType {
+        CommandType::Transfer
+    }
+
+    fn frequency(&self) -> f64 {
+        self.queue.frequency
+    }
+
+    fn create_command_buffer(
+        &self,
+        device: &Self::Device,
+    ) -> CommandBufferState<Self::CommandBuffer> {
+        let buffer = self.queue.create_command_buffer(device);
         let temps = self.res_pool.lock().pop().unwrap_or_default();
 
-        DxIoCommandBuffer { buffer, temps }
+        match buffer {
+            CommandBufferState::New(buffer) => {
+                CommandBufferState::New(DxIoCommandBuffer { buffer, temps })
+            }
+            CommandBufferState::Stashed(buffer) => {
+                CommandBufferState::Stashed(DxIoCommandBuffer { buffer, temps })
+            }
+            CommandBufferState::Created(buffer) => {
+                CommandBufferState::Created(DxIoCommandBuffer { buffer, temps })
+            }
+        }
     }
 
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer) {

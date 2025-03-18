@@ -48,7 +48,7 @@ impl<D: RenderDevice> RenderResourceContext for Context<D> {
         let buffer = self.gpu.create_buffer(desc);
 
         if let Some(init_data) = init_data {
-            let mut cmd = self.uploader.create_command_buffer();
+            let mut cmd = self.uploader.create_command_buffer(&self.gpu).cmd();
             cmd.load_to_buffer(&self.gpu, &buffer, init_data);
             self.uploader.commit(cmd);
             self.uploader.wait_on_cpu(self.uploader.submit(&self.gpu));
@@ -71,7 +71,7 @@ impl<D: RenderDevice> RenderResourceContext for Context<D> {
         let texture = self.gpu.create_texture(desc);
 
         if let Some(init_data) = init_data {
-            let mut cmd = self.uploader.create_command_buffer();
+            let mut cmd = self.uploader.create_command_buffer(&self.gpu).cmd();
             cmd.load_to_texture(&self.gpu, &texture, init_data);
             self.uploader.commit(cmd);
             self.uploader.wait_on_cpu(self.uploader.submit(&self.gpu));

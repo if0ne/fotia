@@ -37,7 +37,13 @@ pub trait RenderCommandQueue {
     type Event;
     type CommandBuffer;
 
-    fn create_command_buffer(&self) -> Self::CommandBuffer;
+    fn ty(&self) -> CommandType;
+    fn frequency(&self) -> f64;
+
+    fn create_command_buffer(
+        &self,
+        device: &Self::Device,
+    ) -> CommandBufferState<Self::CommandBuffer>;
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer);
     fn commit(&self, cmd_buffer: Self::CommandBuffer);
     fn submit(&self, device: &Self::Device) -> SyncPoint;
@@ -88,6 +94,18 @@ pub trait RenderCommandBuffer {
         targets: impl IntoIterator<Item = &'a <Self::Device as RenderResourceDevice>::Texture>,
         depth: Option<&<Self::Device as RenderResourceDevice>::Texture>,
     ) -> Self::RenderEncoder<'_>;
+
+    fn begin_timestamp(
+        &mut self,
+        query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
+    );
+
+    fn end_timestamp(&mut self, query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery);
+
+    fn resolve_timestamp_data(
+        &mut self,
+        query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
+    ) -> std::ops::Range<usize>;
 }
 
 pub trait GpuEvent {
@@ -116,4 +134,21 @@ pub trait RenderEncoder {
 
     fn draw(&mut self, count: u32, start_vertex: u32);
     fn draw_indexed(&mut self, count: u32, start_index: u32, base_index: u32);
+}
+
+#[derive(Debug)]
+pub enum CommandBufferState<T> {
+    New(T),
+    Stashed(T),
+    Created(T),
+}
+
+impl<T> CommandBufferState<T> {
+    pub fn cmd(self) -> T {
+        match self {
+            CommandBufferState::New(cmd) => cmd,
+            CommandBufferState::Stashed(cmd) => cmd,
+            CommandBufferState::Created(cmd) => cmd,
+        }
+    }
 }

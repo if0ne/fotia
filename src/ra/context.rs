@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 use crate::rhi::{
     command::{
@@ -9,7 +9,10 @@ use crate::rhi::{
     swapchain::{RenderSwapchainDevice, Surface},
 };
 
-use super::{command::CommandQueue, resources::ResourceMapper};
+use super::{
+    command::{CommandQueue, QUERY_SIZE},
+    resources::ResourceMapper,
+};
 
 pub trait RenderDevice:
     RenderResourceDevice
@@ -67,17 +70,34 @@ impl<D: RenderDevice> Context<D> {
     pub fn new(gpu: D) -> Self {
         let mapper = Arc::new(ResourceMapper::default());
 
+        let queries = (0..3)
+            .map(|_| gpu.create_timestamp_query(CommandType::Graphics, QUERY_SIZE))
+            .collect::<VecDeque<_>>();
+
         let graphics_queue = CommandQueue::new(
             gpu.create_command_queue(CommandType::Graphics, None),
             Arc::clone(&mapper),
+            queries,
         );
+
+        let queries = (0..3)
+            .map(|_| gpu.create_timestamp_query(CommandType::Compute, QUERY_SIZE))
+            .collect::<VecDeque<_>>();
+
         let compute_queue = CommandQueue::new(
             gpu.create_command_queue(CommandType::Compute, None),
             Arc::clone(&mapper),
+            queries,
         );
+
+        let queries = (0..3)
+            .map(|_| gpu.create_timestamp_query(CommandType::Transfer, QUERY_SIZE))
+            .collect::<VecDeque<_>>();
+
         let transfer_queue = CommandQueue::new(
             gpu.create_command_queue(CommandType::Transfer, None),
             Arc::clone(&mapper),
+            queries,
         );
 
         let uploader = gpu.create_resource_uploader();
