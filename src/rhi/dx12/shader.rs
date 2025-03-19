@@ -21,8 +21,12 @@ impl RenderShaderDevice for DxDevice {
     type RasterPipeline = DxRasterPipeline;
 
     fn create_pipeline_layout(&self, desc: PipelineLayoutDesc<'_>) -> Self::PipelineLayout {
-        let mut ranges = vec![];
-        let mut dynamic_buffers = vec![];
+        let mut ranges = SmallVec::<[_; 8]>::new();
+        let mut sampler_ranges = SmallVec::<[_; 8]>::new();
+        let mut dynamic_buffers = SmallVec::<[_; 4]>::new();
+
+        let mut ranges_count = SmallVec::<[_; 4]>::new();
+        let mut samplers_count = SmallVec::<[_; 4]>::new();
 
         for (i, set) in desc.sets.iter().enumerate() {
             let mut srvs = 0;
@@ -52,23 +56,39 @@ impl RenderShaderDevice for DxDevice {
                             .with_register_space(i as u32)
                     }
                 };
-                ranges.push(range);
+
+                if binding.ty != BindingType::Sampler {
+                    ranges.push(range);
+                } else {
+                    sampler_ranges.push(range);
+                }
             }
 
             if set.use_dynamic_buffer {
-                dynamic_buffers.push((i, set.entries.len())); // set and index
+                dynamic_buffers.push((i, cbvs)); // set and index
             }
+
+            ranges_count.push(cbvs + uavs + srvs);
+            samplers_count.push(samplers);
         }
 
         let mut tables = vec![];
-        let mut offset = 0;
+        let mut range_offest = 0;
+        let mut sampler_offest = 0;
 
-        for set in desc.sets {
-            let ranges = &ranges[offset..(offset + set.entries.len())];
+        for (range_count, sampler_count) in ranges_count.iter().zip(samplers_count.iter()) {
+            let ranges = &ranges[range_offest..(range_offest + *range_count as usize)];
+            let samplers =
+                &sampler_ranges[sampler_offest..(sampler_offest + *sampler_count as usize)];
 
             if ranges.len() > 0 {
                 tables.push(dx::RootParameter::descriptor_table(ranges));
-                offset += set.entries.len();
+                range_offest += *range_count as usize;
+            }
+
+            if samplers.len() > 0 {
+                tables.push(dx::RootParameter::descriptor_table(samplers));
+                sampler_offest += *sampler_count as usize;
             }
         }
 
