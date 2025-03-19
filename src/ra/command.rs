@@ -40,6 +40,7 @@ pub(super) struct TimestampEntry<D: RenderDevice> {
     query: D::TimestampQuery,
     range: Option<Range<usize>>,
     labels: Vec<Cow<'static, str>>,
+    is_used: bool,
 }
 
 impl<D: RenderDevice> TimestampEntry<D> {
@@ -48,6 +49,7 @@ impl<D: RenderDevice> TimestampEntry<D> {
             query,
             range: None,
             labels: vec![],
+            is_used: false,
         }
     }
 }
@@ -96,15 +98,20 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
     ) -> CommandBufferState<Self::CommandBuffer> {
         match self.raw.create_command_buffer(&device) {
             CommandBufferState::New(cmd) => {
+                let mut guard = self.timestamp_queries.lock();
                 let TimestampEntry {
                     query,
                     range,
                     labels,
-                } = self
-                    .timestamp_queries
-                    .lock()
-                    .pop_front()
-                    .expect("wrong count of timestamp heaps");
+                    ..
+                } = if guard.front().is_some_and(|q| !q.is_used) {
+                    guard.pop_front().unwrap_or_else(|| {
+                        TimestampEntry::new(device.create_timestamp_query(self.ty(), QUERY_SIZE))
+                    })
+                } else {
+                    TimestampEntry::new(device.create_timestamp_query(self.ty(), QUERY_SIZE))
+                };
+
                 CommandBufferState::New(Self::CommandBuffer::new(
                     cmd,
                     Arc::clone(&self.mapper),
@@ -119,6 +126,7 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
                     query,
                     range,
                     labels,
+                    ..
                 } = self
                     .timestamp_queries
                     .lock()
@@ -153,6 +161,7 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
             query: cmd_buffer.query.into_inner(),
             range: cmd_buffer.range,
             labels: cmd_buffer.labels,
+            is_used: true,
         });
         self.raw.enqueue(cmd_buffer.raw);
     }
@@ -167,11 +176,16 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
             query: cmd_buffer.query.into_inner(),
             range: Some(range),
             labels: cmd_buffer.labels,
+            is_used: true,
         });
         self.raw.commit(cmd_buffer.raw);
     }
 
     fn submit(&self, device: &Self::Device) -> SyncPoint {
+        self.timestamp_queries
+            .lock()
+            .iter_mut()
+            .for_each(|q| q.is_used = false);
         self.raw.submit(device)
     }
 
