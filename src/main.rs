@@ -30,7 +30,11 @@ fn main() {
 
     let rs = RenderSystem::new(&[RenderBackendSettings {
         api: RenderBackend::Dx12,
-        debug: DebugFlags::all(),
+        debug: if cfg!(debug_assertions) {
+            DebugFlags::all()
+        } else {
+            DebugFlags::empty()
+        },
     }]);
 
     let backend = rs.dx_backend().expect("failed to get directx backend");

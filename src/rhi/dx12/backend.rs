@@ -34,14 +34,18 @@ impl DxBackend {
 
         let factory = dx::create_factory4(flags).expect("failed to create DXGI factory");
 
-        let debug = if !debug_flags.is_empty() {
+        let debug = if debug_flags.contains(DebugFlags::CpuValidation) {
             let debug: dx::Debug1 = dx::create_debug()
                 .expect("failed to create debug")
                 .try_into()
                 .expect("failed to fetch debug1");
 
             debug.enable_debug_layer();
-            debug.set_enable_gpu_based_validation(true);
+
+            if debug_flags.contains(DebugFlags::GpuValidation) {
+                debug.set_enable_gpu_based_validation(true);
+            }
+
             debug.set_callback(Box::new(|_, severity, _, msg| match severity {
                 dx::MessageSeverity::Corruption => error!("[D3D12 Validation] {}", msg),
                 dx::MessageSeverity::Error => error!("[D3D12 Validation] {}", msg),
@@ -55,7 +59,7 @@ impl DxBackend {
             None
         };
 
-        let mut gpus = vec![];
+        let mut gpus = SmallVec::<[_; 4]>::new();
 
         if let Ok(factory) = TryInto::<dx::Factory7>::try_into(factory.clone()) {
             debug!("Factory7 is supported");
