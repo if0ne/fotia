@@ -313,10 +313,12 @@ impl RenderCommandBuffer for DxCommandBuffer {
     }
 
     fn begin(&self, device: &Self::Device) {
-        self.list.set_descriptor_heaps(&[
-            Some(device.descriptors.shader_heap.lock().heap.clone()),
-            Some(device.descriptors.sampler_heap.lock().heap.clone()),
-        ]);
+        if self.ty != CommandType::Transfer {
+            self.list.set_descriptor_heaps(&[
+                Some(device.descriptors.shader_heap.lock().heap.clone()),
+                Some(device.descriptors.sampler_heap.lock().heap.clone()),
+            ]);
+        }
     }
 
     fn set_barriers<'a>(&self, barriers: impl IntoIterator<Item = Barrier<'a, Self::Device>>) {
