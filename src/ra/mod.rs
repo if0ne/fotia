@@ -1,3 +1,5 @@
+use std::{borrow::Cow, collections::HashMap, time::Duration};
+
 pub mod backend;
 pub mod command;
 pub mod context;
@@ -10,5 +12,6 @@ mod container;
 
 #[derive(Clone, Debug)]
 pub struct Timings {
-    pub timings: Vec<f64>,
+    pub timings: HashMap<Cow<'static, str>, Duration>,
+    pub total: Duration,
 }

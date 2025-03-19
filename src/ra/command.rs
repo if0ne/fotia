@@ -1,4 +1,11 @@
-use std::{cell::RefCell, collections::VecDeque, ops::Range, sync::Arc};
+use std::{
+    borrow::Cow,
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    ops::Range,
+    sync::Arc,
+    time::Duration,
+};
 
 use parking_lot::Mutex;
 
@@ -29,10 +36,26 @@ type CommandBuffer<D> =
 
 type RenderEncoderType<'a, D> = <CommandBuffer<D> as RenderCommandBuffer>::RenderEncoder<'a>;
 
+pub(super) struct TimestampEntry<D: RenderDevice> {
+    query: D::TimestampQuery,
+    range: Option<Range<usize>>,
+    labels: Vec<Cow<'static, str>>,
+}
+
+impl<D: RenderDevice> TimestampEntry<D> {
+    pub fn new(query: D::TimestampQuery) -> Self {
+        Self {
+            query,
+            range: None,
+            labels: vec![],
+        }
+    }
+}
+
 pub struct CommandQueue<D: RenderDevice> {
     pub(super) raw: D::CommandQueue,
     pub(super) mapper: Arc<ResourceMapper<D>>,
-    pub(super) timestamp_queries: Mutex<VecDeque<(D::TimestampQuery, Option<Range<usize>>)>>,
+    pub(super) timestamp_queries: Mutex<VecDeque<TimestampEntry<D>>>,
 }
 
 impl<D: RenderDevice> CommandQueue<D> {
@@ -45,7 +68,10 @@ impl<D: RenderDevice> CommandQueue<D> {
             raw,
             mapper,
             timestamp_queries: Mutex::new(
-                timestamp_queries.into_iter().map(|q| (q, None)).collect(),
+                timestamp_queries
+                    .into_iter()
+                    .map(|q| TimestampEntry::new(q))
+                    .collect(),
             ),
         }
     }
@@ -70,7 +96,11 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
     ) -> CommandBufferState<Self::CommandBuffer> {
         match self.raw.create_command_buffer(&device) {
             CommandBufferState::New(cmd) => {
-                let (query, range) = self
+                let TimestampEntry {
+                    query,
+                    range,
+                    labels,
+                } = self
                     .timestamp_queries
                     .lock()
                     .pop_front()
@@ -80,20 +110,27 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
                     Arc::clone(&self.mapper),
                     query,
                     range,
+                    labels,
                     self.frequency(),
                 ))
             }
             CommandBufferState::Stashed(cmd) => {
-                let (query, range) = self
+                let TimestampEntry {
+                    query,
+                    range,
+                    labels,
+                } = self
                     .timestamp_queries
                     .lock()
                     .pop_front()
                     .expect("wrong count of timestamp heaps");
+
                 CommandBufferState::Stashed(Self::CommandBuffer::new(
                     cmd,
                     Arc::clone(&self.mapper),
                     query,
                     range,
+                    labels,
                     self.frequency(),
                 ))
             }
@@ -104,6 +141,7 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
                     Arc::clone(&self.mapper),
                     query,
                     None,
+                    vec![],
                     self.frequency(),
                 ))
             }
@@ -111,21 +149,25 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
     }
 
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer) {
-        self.timestamp_queries
-            .lock()
-            .push_front((cmd_buffer.query.into_inner(), cmd_buffer.range));
+        self.timestamp_queries.lock().push_front(TimestampEntry {
+            query: cmd_buffer.query.into_inner(),
+            range: cmd_buffer.range,
+            labels: cmd_buffer.labels,
+        });
         self.raw.enqueue(cmd_buffer.raw);
     }
 
-    fn commit(&self, mut cmd_buffer: Self::CommandBuffer) {
+    fn commit(&self, cmd_buffer: Self::CommandBuffer) {
         cmd_buffer.write_timestamp();
         let range = cmd_buffer
             .raw
             .resolve_timestamp_data(&mut *cmd_buffer.query.borrow_mut());
 
-        self.timestamp_queries
-            .lock()
-            .push_back((cmd_buffer.query.into_inner(), Some(range)));
+        self.timestamp_queries.lock().push_back(TimestampEntry {
+            query: cmd_buffer.query.into_inner(),
+            range: Some(range),
+            labels: cmd_buffer.labels,
+        });
         self.raw.commit(cmd_buffer.raw);
     }
 
@@ -159,6 +201,7 @@ pub struct CommandEncoder<D: RenderDevice> {
     pub(super) mapper: Arc<ResourceMapper<D>>,
     pub(super) query: RefCell<D::TimestampQuery>,
     pub(super) range: Option<Range<usize>>,
+    pub(super) labels: Vec<Cow<'static, str>>,
     pub(super) frequency: f64,
 }
 
@@ -168,6 +211,7 @@ impl<D: RenderDevice> CommandEncoder<D> {
         mapper: Arc<ResourceMapper<D>>,
         query: D::TimestampQuery,
         range: Option<Range<usize>>,
+        labels: Vec<Cow<'static, str>>,
         frequency: f64,
     ) -> Self {
         Self {
@@ -175,6 +219,7 @@ impl<D: RenderDevice> CommandEncoder<D> {
             mapper,
             query: RefCell::new(query),
             range,
+            labels,
             frequency,
         }
     }
@@ -278,6 +323,7 @@ pub trait RenderCommandEncoder<D: RenderDevice> {
 
     fn render(
         &mut self,
+        label: Cow<'static, str>,
         targets: &[Handle<Texture>],
         depth: Option<Handle<Texture>>,
     ) -> Self::RenderEncoder<'_>;
@@ -295,17 +341,28 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
             let ptr: &[u64] = bytemuck::cast_slice(query.read_buffer());
             let ptr = &ptr[range];
 
-            let mut prev = ptr[0];
-            let timings = ptr[1..]
-                .iter()
-                .map(|next| {
-                    let ms = (*next - prev) as f64 / self.frequency * 1000.0;
-                    prev = *next;
-                    ms
-                })
-                .collect::<Vec<_>>();
+            let timings = if self.labels.len() > 0 {
+                let mut prev = ptr[1];
+                let timings = ptr[2..]
+                    .iter()
+                    .map(|next| {
+                        let ms = Duration::from_secs_f64((*next - prev) as f64 / self.frequency);
+                        prev = *next;
+                        ms
+                    })
+                    .zip(self.labels.drain(..))
+                    .map(|(time, label)| (label, time))
+                    .collect::<HashMap<_, _>>();
 
-            Timings { timings }
+                timings
+            } else {
+                HashMap::new()
+            };
+
+            let total =
+                Duration::from_secs_f64((ptr[ptr.len() - 1] - ptr[0]) as f64 / self.frequency);
+
+            Timings { timings, total }
         });
 
         self.write_timestamp();
@@ -334,10 +391,12 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
 
     fn render(
         &mut self,
+        label: Cow<'static, str>,
         targets: &[Handle<Texture>],
         depth: Option<Handle<Texture>>,
     ) -> Self::RenderEncoder<'_> {
         self.write_timestamp();
+        self.labels.push(label);
 
         let guard = self.mapper.textures.lock();
         let targets = targets

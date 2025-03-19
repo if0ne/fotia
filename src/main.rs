@@ -162,7 +162,7 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                         ResourceState::RenderTarget,
                     )]);
                     {
-                        let mut encoder = encoder.render(&[], None);
+                        let mut encoder = encoder.render("Clear framebuffer".into(), &[], None);
                         encoder.clear_rt(frame.texture, [0.5, 0.32, 0.16, 1.0]);
                     }
 
