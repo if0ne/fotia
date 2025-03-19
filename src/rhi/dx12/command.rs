@@ -1,6 +1,9 @@
 use std::{
+    borrow::Cow,
     collections::VecDeque,
+    ops::Range,
     sync::{Arc, atomic::AtomicU64},
+    time::Duration,
 };
 
 use oxidx::dx::{
@@ -12,19 +15,21 @@ use smallvec::SmallVec;
 
 use crate::rhi::{
     command::{
-        Barrier, CommandBufferState, CommandType, GpuEvent, IoCommandBuffer, RenderCommandBuffer,
-        RenderCommandDevice, RenderCommandQueue, RenderEncoder, RenderResourceUploader, SyncPoint,
+        Barrier, CommandType, GpuEvent, IoCommandBuffer, RenderCommandBuffer, RenderCommandDevice,
+        RenderCommandQueue, RenderEncoder, RenderResourceUploader, SyncPoint,
     },
-    resources::{BufferDesc, BufferUsages, MemoryLocation, RenderResourceDevice},
-    types::{IndexType, Scissor, Viewport},
+    resources::{BufferDesc, BufferUsages, MemoryLocation, QueryHeap, RenderResourceDevice},
+    types::{IndexType, Scissor, Timings, Viewport},
 };
 
 use super::{
     conv::{map_command_buffer_type, map_resource_state},
     device::DxDevice,
-    resources::{DxBuffer, DxTexture},
+    resources::{DxBuffer, DxTexture, DxTimestampQuery},
     shader::{DxRasterPipeline, DxShaderArgument},
 };
+
+pub const QUERY_SIZE: usize = 64;
 
 impl RenderCommandDevice for DxDevice {
     type ResourceUploader = DxResourceUploader;
@@ -50,6 +55,9 @@ impl RenderCommandDevice for DxDevice {
                     .create_command_allocator(map_command_buffer_type(ty))
                     .expect("failed to create command allocator"),
                 sync_point: 0,
+                query: self.create_timestamp_query(ty, QUERY_SIZE),
+                range: None,
+                labels: vec![],
             })
             .collect::<VecDeque<_>>();
 
@@ -164,15 +172,11 @@ impl RenderCommandQueue for DxCommandQueue {
     }
 
     #[allow(unused_assignments)]
-    fn create_command_buffer(
-        &self,
-        device: &Self::Device,
-    ) -> CommandBufferState<Self::CommandBuffer> {
+    fn create_command_buffer(&self, device: &Self::Device) -> Self::CommandBuffer {
         if let Some(buffer) = self.in_record.lock().pop() {
-            return CommandBufferState::Stashed(buffer);
+            return buffer;
         };
 
-        let mut created = false;
         let allocator = if let Some(allocator) =
             self.cmd_allocators.lock().pop_front().and_then(|a| {
                 if self.fence.get_completed_value() >= a.sync_point {
@@ -181,7 +185,6 @@ impl RenderCommandQueue for DxCommandQueue {
                     None
                 }
             }) {
-            created = false;
             allocator
                 .raw
                 .reset()
@@ -190,19 +193,20 @@ impl RenderCommandQueue for DxCommandQueue {
             allocator
         } else {
             if self.capacity.is_some() {
-                created = false;
                 let entry = self.cmd_allocators.lock().pop_front().expect("unreachable");
                 self.fence.wait(entry.sync_point);
 
                 entry
             } else {
-                created = true;
                 CommandAllocatorEntry {
                     raw: device
                         .gpu
                         .create_command_allocator(self.ty_raw)
                         .expect("failed to create command allocator"),
                     sync_point: 0,
+                    query: device.create_timestamp_query(self.ty, QUERY_SIZE),
+                    range: None,
+                    labels: vec![],
                 }
             }
         };
@@ -220,16 +224,11 @@ impl RenderCommandQueue for DxCommandQueue {
             list
         };
 
-        let cmd = DxCommandBuffer {
+        DxCommandBuffer {
             list,
             allocator,
             ty: self.ty,
-        };
-
-        if created {
-            CommandBufferState::Created(cmd)
-        } else {
-            CommandBufferState::New(cmd)
+            frequency: self.frequency,
         }
     }
 
@@ -237,7 +236,10 @@ impl RenderCommandQueue for DxCommandQueue {
         self.in_record.lock().push(cmd_buffer);
     }
 
-    fn commit(&self, cmd_buffer: Self::CommandBuffer) {
+    fn commit(&self, mut cmd_buffer: Self::CommandBuffer) {
+        cmd_buffer.write_timestamp();
+        cmd_buffer.resolve_timestamp_data();
+
         cmd_buffer.list.close().expect("Failed to close list");
         self.pending.lock().push(cmd_buffer);
     }
@@ -301,7 +303,20 @@ impl RenderCommandQueue for DxCommandQueue {
 pub struct DxCommandBuffer {
     allocator: CommandAllocatorEntry,
     ty: CommandType,
-    pub(super) list: dx::GraphicsCommandList,
+    frequency: f64,
+
+    list: dx::GraphicsCommandList,
+}
+
+impl DxCommandBuffer {
+    fn write_timestamp(&mut self) {
+        self.list.end_query(
+            &self.allocator.query.raw,
+            dx::QueryType::Timestamp,
+            self.allocator.query.cur_index,
+        );
+        self.allocator.query.cur_index += 1;
+    }
 }
 
 impl RenderCommandBuffer for DxCommandBuffer {
@@ -312,13 +327,44 @@ impl RenderCommandBuffer for DxCommandBuffer {
         self.ty
     }
 
-    fn begin(&self, device: &Self::Device) {
+    fn begin(&mut self, device: &Self::Device) -> Option<Timings> {
+        let timings = self.allocator.range.take().map(|range| {
+            let ptr: &[u64] = bytemuck::cast_slice(self.allocator.query.read_buffer());
+            let ptr = &ptr[range];
+
+            let timings = if !self.allocator.labels.is_empty() {
+                let label_count = self.allocator.labels.len();
+                let mut timings_map = Vec::with_capacity(label_count);
+
+                let durations = ptr[1..].iter().zip(ptr[2..].iter()).map(|(prev, next)| {
+                    Duration::from_secs_f64((*next - *prev) as f64 / self.frequency)
+                });
+
+                timings_map.extend(
+                    durations
+                        .zip(self.allocator.labels.drain(..))
+                        .map(|(time, label)| (label, time)),
+                );
+                timings_map
+            } else {
+                Vec::new()
+            };
+
+            let total =
+                Duration::from_secs_f64((ptr[ptr.len() - 1] - ptr[0]) as f64 / self.frequency);
+
+            Timings { timings, total }
+        });
+
+        self.write_timestamp();
         if self.ty != CommandType::Transfer {
             self.list.set_descriptor_heaps(&[
                 Some(device.descriptors.shader_heap.lock().heap.clone()),
                 Some(device.descriptors.sampler_heap.lock().heap.clone()),
             ]);
         }
+
+        timings
     }
 
     fn set_barriers<'a>(&self, barriers: impl IntoIterator<Item = Barrier<'a, Self::Device>>) {
@@ -364,10 +410,14 @@ impl RenderCommandBuffer for DxCommandBuffer {
     }
 
     fn render<'a>(
-        &self,
+        &mut self,
+        label: Cow<'static, str>,
         targets: impl IntoIterator<Item = &'a <Self::Device as RenderResourceDevice>::Texture>,
         depth: Option<&<Self::Device as RenderResourceDevice>::Texture>,
     ) -> Self::RenderEncoder<'_> {
+        self.write_timestamp();
+        self.allocator.labels.push(label);
+
         let targets = targets
             .into_iter()
             .filter_map(|t| t.descriptor.as_ref().map(|d| d.cpu))
@@ -380,29 +430,21 @@ impl RenderCommandBuffer for DxCommandBuffer {
         DxRenderEncoder { cmd: self }
     }
 
-    fn write_timestamp(&self, query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery) {
-        self.list
-            .end_query(&query.raw, dx::QueryType::Timestamp, query.cur_index);
-        query.cur_index += 1;
-    }
+    fn resolve_timestamp_data(&mut self) -> std::ops::Range<usize> {
+        let range = 0..self.allocator.query.cur_index;
 
-    fn resolve_timestamp_data(
-        &self,
-        query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
-    ) -> std::ops::Range<usize> {
-        let range = 0..query.cur_index;
-
-        if query.cur_index > 0 {
+        if self.allocator.query.cur_index > 0 {
             self.list.resolve_query_data(
-                &query.raw,
+                &self.allocator.query.raw,
                 dx::QueryType::Timestamp,
                 range.clone(),
-                &query.buffer.raw,
+                &self.allocator.query.buffer.raw,
                 0,
             );
         }
 
-        query.cur_index = 0;
+        self.allocator.range = Some(range.clone());
+        self.allocator.query.cur_index = 0;
 
         range
     }
@@ -411,7 +453,10 @@ impl RenderCommandBuffer for DxCommandBuffer {
 #[derive(Debug)]
 struct CommandAllocatorEntry {
     raw: dx::CommandAllocator,
+    query: DxTimestampQuery,
     sync_point: SyncPoint,
+    range: Option<Range<usize>>,
+    labels: Vec<Cow<'static, str>>,
 }
 
 pub struct DxResourceUploader {
@@ -435,24 +480,11 @@ impl RenderCommandQueue for DxResourceUploader {
         self.queue.frequency
     }
 
-    fn create_command_buffer(
-        &self,
-        device: &Self::Device,
-    ) -> CommandBufferState<Self::CommandBuffer> {
+    fn create_command_buffer(&self, device: &Self::Device) -> Self::CommandBuffer {
         let buffer = self.queue.create_command_buffer(device);
         let temps = self.res_pool.lock().pop().unwrap_or_default();
 
-        match buffer {
-            CommandBufferState::New(buffer) => {
-                CommandBufferState::New(DxIoCommandBuffer { buffer, temps })
-            }
-            CommandBufferState::Stashed(buffer) => {
-                CommandBufferState::Stashed(DxIoCommandBuffer { buffer, temps })
-            }
-            CommandBufferState::Created(buffer) => {
-                CommandBufferState::Created(DxIoCommandBuffer { buffer, temps })
-            }
-        }
+        DxIoCommandBuffer { buffer, temps }
     }
 
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer) {
@@ -624,7 +656,7 @@ impl GpuEvent for DxFence {
 
 #[derive(Debug)]
 pub struct DxRenderEncoder<'a> {
-    pub(super) cmd: &'a DxCommandBuffer,
+    pub(super) cmd: &'a mut DxCommandBuffer,
 }
 
 impl<'a> RenderEncoder for DxRenderEncoder<'a> {
@@ -714,5 +746,11 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
         self.cmd
             .list
             .draw_indexed_instanced(count, 1, start_index, base_vertex as i32, 0);
+    }
+}
+
+impl Drop for DxRenderEncoder<'_> {
+    fn drop(&mut self) {
+        self.cmd.write_timestamp();
     }
 }

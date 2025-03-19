@@ -1,6 +1,8 @@
+use std::borrow::Cow;
+
 use super::{
     resources::RenderResourceDevice,
-    types::{IndexType, ResourceState, Scissor, Viewport},
+    types::{IndexType, ResourceState, Scissor, Timings, Viewport},
 };
 
 pub type SyncPoint = u64;
@@ -41,10 +43,7 @@ pub trait RenderCommandQueue {
     fn ty(&self) -> CommandType;
     fn frequency(&self) -> f64;
 
-    fn create_command_buffer(
-        &self,
-        device: &Self::Device,
-    ) -> CommandBufferState<Self::CommandBuffer>;
+    fn create_command_buffer(&self, device: &Self::Device) -> Self::CommandBuffer;
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer);
     fn commit(&self, cmd_buffer: Self::CommandBuffer);
     fn submit(&self, device: &Self::Device) -> SyncPoint;
@@ -86,22 +85,18 @@ pub trait RenderCommandBuffer {
 
     fn ty(&self) -> CommandType;
 
-    fn begin(&self, device: &Self::Device);
+    fn begin(&mut self, device: &Self::Device) -> Option<Timings>;
 
     fn set_barriers<'a>(&self, barriers: impl IntoIterator<Item = Barrier<'a, Self::Device>>);
 
     fn render<'a>(
-        &self,
+        &mut self,
+        label: Cow<'static, str>,
         targets: impl IntoIterator<Item = &'a <Self::Device as RenderResourceDevice>::Texture>,
         depth: Option<&<Self::Device as RenderResourceDevice>::Texture>,
     ) -> Self::RenderEncoder<'_>;
 
-    fn write_timestamp(&self, query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery);
-
-    fn resolve_timestamp_data(
-        &self,
-        query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
-    ) -> std::ops::Range<usize>;
+    fn resolve_timestamp_data(&mut self) -> std::ops::Range<usize>;
 }
 
 pub trait GpuEvent {
@@ -130,21 +125,4 @@ pub trait RenderEncoder {
 
     fn draw(&self, count: u32, start_vertex: u32);
     fn draw_indexed(&self, count: u32, start_index: u32, base_index: u32);
-}
-
-#[derive(Debug)]
-pub enum CommandBufferState<T> {
-    New(T),
-    Stashed(T),
-    Created(T),
-}
-
-impl<T> CommandBufferState<T> {
-    pub fn cmd(self) -> T {
-        match self {
-            CommandBufferState::New(cmd) => cmd,
-            CommandBufferState::Stashed(cmd) => cmd,
-            CommandBufferState::Created(cmd) => cmd,
-        }
-    }
 }

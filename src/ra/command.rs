@@ -1,81 +1,36 @@
-use std::{
-    borrow::Cow,
-    cell::RefCell,
-    collections::{HashMap, VecDeque},
-    ops::Range,
-    sync::Arc,
-    time::Duration,
-};
-
-use parking_lot::Mutex;
+use std::{borrow::Cow, sync::Arc};
 
 use crate::{
     collections::handle::Handle,
     rhi::{
         self,
         command::{
-            CommandBufferState, CommandType, RenderCommandBuffer, RenderCommandDevice,
-            RenderCommandQueue, RenderEncoder as _, SyncPoint,
+            CommandType, RenderCommandBuffer, RenderCommandDevice, RenderCommandQueue,
+            RenderEncoder as _, SyncPoint,
         },
-        resources::QueryHeap,
-        types::{IndexType, ResourceState, Scissor, Viewport},
+        types::{IndexType, ResourceState, Scissor, Timings, Viewport},
     },
 };
 
 use super::{
-    Timings,
     context::{Context, RenderDevice},
     resources::{Buffer, ResourceMapper, Texture},
     shader::{RasterPipeline, ShaderArgument},
 };
-
-pub(super) const QUERY_SIZE: usize = 64;
 
 type CommandBuffer<D> =
     <<D as RenderCommandDevice>::CommandQueue as RenderCommandQueue>::CommandBuffer;
 
 type RenderEncoderType<'a, D> = <CommandBuffer<D> as RenderCommandBuffer>::RenderEncoder<'a>;
 
-pub(super) struct TimestampEntry<D: RenderDevice> {
-    query: D::TimestampQuery,
-    range: Option<Range<usize>>,
-    labels: Vec<Cow<'static, str>>,
-    is_used: bool,
-}
-
-impl<D: RenderDevice> TimestampEntry<D> {
-    pub fn new(query: D::TimestampQuery) -> Self {
-        Self {
-            query,
-            range: None,
-            labels: vec![],
-            is_used: false,
-        }
-    }
-}
-
 pub struct CommandQueue<D: RenderDevice> {
     pub(super) raw: D::CommandQueue,
     pub(super) mapper: Arc<ResourceMapper<D>>,
-    pub(super) timestamp_queries: Mutex<VecDeque<TimestampEntry<D>>>,
 }
 
 impl<D: RenderDevice> CommandQueue<D> {
-    pub(super) fn new(
-        raw: D::CommandQueue,
-        mapper: Arc<ResourceMapper<D>>,
-        timestamp_queries: VecDeque<D::TimestampQuery>,
-    ) -> Self {
-        Self {
-            raw,
-            mapper,
-            timestamp_queries: Mutex::new(
-                timestamp_queries
-                    .into_iter()
-                    .map(|q| TimestampEntry::new(q))
-                    .collect(),
-            ),
-        }
+    pub(super) fn new(raw: D::CommandQueue, mapper: Arc<ResourceMapper<D>>) -> Self {
+        Self { raw, mapper }
     }
 }
 
@@ -92,100 +47,21 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
         self.raw.frequency()
     }
 
-    fn create_command_buffer(
-        &self,
-        device: &Self::Device,
-    ) -> CommandBufferState<Self::CommandBuffer> {
-        match self.raw.create_command_buffer(&device) {
-            CommandBufferState::New(cmd) => {
-                let mut guard = self.timestamp_queries.lock();
-                let TimestampEntry {
-                    query,
-                    range,
-                    labels,
-                    ..
-                } = if guard.front().is_some_and(|q| !q.is_used) {
-                    guard.pop_front().unwrap_or_else(|| {
-                        TimestampEntry::new(device.create_timestamp_query(self.ty(), QUERY_SIZE))
-                    })
-                } else {
-                    TimestampEntry::new(device.create_timestamp_query(self.ty(), QUERY_SIZE))
-                };
+    fn create_command_buffer(&self, device: &Self::Device) -> Self::CommandBuffer {
+        let cmd = self.raw.create_command_buffer(&device);
 
-                CommandBufferState::New(Self::CommandBuffer::new(
-                    cmd,
-                    Arc::clone(&self.mapper),
-                    query,
-                    range,
-                    labels,
-                    self.frequency(),
-                ))
-            }
-            CommandBufferState::Stashed(cmd) => {
-                let TimestampEntry {
-                    query,
-                    range,
-                    labels,
-                    ..
-                } = self
-                    .timestamp_queries
-                    .lock()
-                    .pop_front()
-                    .expect("wrong count of timestamp heaps");
-
-                CommandBufferState::Stashed(Self::CommandBuffer::new(
-                    cmd,
-                    Arc::clone(&self.mapper),
-                    query,
-                    range,
-                    labels,
-                    self.frequency(),
-                ))
-            }
-            CommandBufferState::Created(cmd) => {
-                let query = device.create_timestamp_query(self.ty(), QUERY_SIZE);
-                CommandBufferState::Created(Self::CommandBuffer::new(
-                    cmd,
-                    Arc::clone(&self.mapper),
-                    query,
-                    None,
-                    vec![],
-                    self.frequency(),
-                ))
-            }
-        }
+        Self::CommandBuffer::new(cmd, Arc::clone(&self.mapper))
     }
 
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer) {
-        self.timestamp_queries.lock().push_front(TimestampEntry {
-            query: cmd_buffer.query.into_inner(),
-            range: cmd_buffer.range,
-            labels: cmd_buffer.labels,
-            is_used: true,
-        });
         self.raw.enqueue(cmd_buffer.raw);
     }
 
     fn commit(&self, cmd_buffer: Self::CommandBuffer) {
-        cmd_buffer.write_timestamp();
-        let range = cmd_buffer
-            .raw
-            .resolve_timestamp_data(&mut *cmd_buffer.query.borrow_mut());
-
-        self.timestamp_queries.lock().push_back(TimestampEntry {
-            query: cmd_buffer.query.into_inner(),
-            range: Some(range),
-            labels: cmd_buffer.labels,
-            is_used: true,
-        });
         self.raw.commit(cmd_buffer.raw);
     }
 
     fn submit(&self, device: &Self::Device) -> SyncPoint {
-        self.timestamp_queries
-            .lock()
-            .iter_mut()
-            .for_each(|q| q.is_used = false);
         self.raw.submit(device)
     }
 
@@ -213,29 +89,11 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
 pub struct CommandEncoder<D: RenderDevice> {
     pub(super) raw: CommandBuffer<D>,
     pub(super) mapper: Arc<ResourceMapper<D>>,
-    pub(super) query: RefCell<D::TimestampQuery>,
-    pub(super) range: Option<Range<usize>>,
-    pub(super) labels: Vec<Cow<'static, str>>,
-    pub(super) frequency: f64,
 }
 
 impl<D: RenderDevice> CommandEncoder<D> {
-    pub(super) fn new(
-        raw: CommandBuffer<D>,
-        mapper: Arc<ResourceMapper<D>>,
-        query: D::TimestampQuery,
-        range: Option<Range<usize>>,
-        labels: Vec<Cow<'static, str>>,
-        frequency: f64,
-    ) -> Self {
-        Self {
-            raw,
-            mapper,
-            query: RefCell::new(query),
-            range,
-            labels,
-            frequency,
-        }
+    pub(super) fn new(raw: CommandBuffer<D>, mapper: Arc<ResourceMapper<D>>) -> Self {
+        Self { raw, mapper }
     }
 }
 
@@ -255,9 +113,9 @@ pub trait RenderCommandContext<D: RenderDevice> {
 impl<D: RenderDevice> RenderCommandContext<D> for Context<D> {
     fn create_encoder(&self, ty: CommandType) -> CommandEncoder<D> {
         match ty {
-            CommandType::Graphics => self.graphics_queue.create_command_buffer(&self.gpu).cmd(),
-            CommandType::Compute => self.compute_queue.create_command_buffer(&self.gpu).cmd(),
-            CommandType::Transfer => self.transfer_queue.create_command_buffer(&self.gpu).cmd(),
+            CommandType::Graphics => self.graphics_queue.create_command_buffer(&self.gpu),
+            CommandType::Compute => self.compute_queue.create_command_buffer(&self.gpu),
+            CommandType::Transfer => self.transfer_queue.create_command_buffer(&self.gpu),
         }
     }
 
@@ -350,39 +208,7 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
         D: 'a;
 
     fn begin(&mut self, ctx: &Context<D>) -> Option<Timings> {
-        let timings = self.range.take().map(|range| {
-            let query = self.query.borrow();
-            let ptr: &[u64] = bytemuck::cast_slice(query.read_buffer());
-            let ptr = &ptr[range];
-
-            let timings = if self.labels.len() > 0 {
-                let mut prev = ptr[1];
-                let timings = ptr[2..]
-                    .iter()
-                    .map(|next| {
-                        let ms = Duration::from_secs_f64((*next - prev) as f64 / self.frequency);
-                        prev = *next;
-                        ms
-                    })
-                    .zip(self.labels.drain(..))
-                    .map(|(time, label)| (label, time))
-                    .collect::<HashMap<_, _>>();
-
-                timings
-            } else {
-                HashMap::new()
-            };
-
-            let total =
-                Duration::from_secs_f64((ptr[ptr.len() - 1] - ptr[0]) as f64 / self.frequency);
-
-            Timings { timings, total }
-        });
-
-        self.write_timestamp();
-        self.raw.begin(&ctx.gpu);
-
-        timings
+        self.raw.begin(&ctx.gpu)
     }
 
     fn set_barriers(&mut self, barriers: &[Barrier]) {
@@ -409,33 +235,22 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
         targets: &[Handle<Texture>],
         depth: Option<Handle<Texture>>,
     ) -> Self::RenderEncoder<'_> {
-        self.write_timestamp();
-        self.labels.push(label);
-
         let guard = self.mapper.textures.lock();
         let targets = targets
             .iter()
             .map(|h| guard.get(*h).expect("failed to get texture"));
         let depth = depth.map(|h| guard.get(h).expect("failed to get texture"));
 
-        let raw = self.raw.render(targets, depth);
+        let raw = self.raw.render(label, targets, depth);
 
         Self::RenderEncoder {
-            cmd: self,
             raw,
             mapper: &self.mapper,
         }
     }
 }
 
-impl<D: RenderDevice> CommandEncoder<D> {
-    pub(super) fn write_timestamp(&self) {
-        self.raw.write_timestamp(&mut *self.query.borrow_mut());
-    }
-}
-
 pub struct RenderEncoderImpl<'a, D: RenderDevice> {
-    pub(super) cmd: &'a CommandEncoder<D>,
     pub(super) raw: RenderEncoderType<'a, D>,
     pub(super) mapper: &'a ResourceMapper<D>,
 }
@@ -505,12 +320,6 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
 
     fn draw_indexed(&mut self, count: u32, start_index: u32, base_index: u32) {
         self.raw.draw_indexed(count, start_index, base_index);
-    }
-}
-
-impl<D: RenderDevice> Drop for RenderEncoderImpl<'_, D> {
-    fn drop(&mut self) {
-        self.cmd.write_timestamp();
     }
 }
 

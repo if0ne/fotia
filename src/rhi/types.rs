@@ -1,3 +1,5 @@
+use std::{borrow::Cow, time::Duration};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Format {
     Unknown,
@@ -121,4 +123,10 @@ pub enum ResourceState {
     Common,
     RenderTarget,
     Present,
+}
+
+#[derive(Clone, Debug)]
+pub struct Timings {
+    pub timings: Vec<(Cow<'static, str>, Duration)>,
+    pub total: Duration,
 }
