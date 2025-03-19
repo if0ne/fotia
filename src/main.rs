@@ -13,6 +13,7 @@ use rhi::{
     types::ResourceState,
 };
 use timer::GameTimer;
+use tracing::info;
 use tracing_subscriber::layer::SubscriberExt;
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
@@ -159,7 +160,7 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                     ctx.wait_on_cpu(CommandType::Graphics, frame.last_access);
                     let mut encoder = ctx.create_encoder(CommandType::Graphics);
                     let timings = encoder.begin(ctx);
-                    dbg!(&timings);
+                    info!("Timings: {:?}", timings);
 
                     encoder.set_barriers(&[Barrier::Texture(
                         frame.texture,
