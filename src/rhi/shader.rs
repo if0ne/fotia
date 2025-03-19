@@ -1,4 +1,4 @@
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, fmt::Debug, path::Path};
 
 use super::{
     resources::RenderResourceDevice,
@@ -12,10 +12,10 @@ pub struct CompiledShader {
 }
 
 pub trait RenderShaderDevice: RenderResourceDevice {
-    type PipelineLayout;
-    type ShaderArgument;
+    type PipelineLayout: Send + Sync + Debug + 'static;
+    type ShaderArgument: Send + Sync + Debug + 'static;
 
-    type RasterPipeline;
+    type RasterPipeline: Send + Sync + Debug + 'static;
 
     fn create_pipeline_layout(&self, desc: PipelineLayoutDesc<'_>) -> Self::PipelineLayout;
     fn destroy_pipeline_layout(&self, layout: Self::PipelineLayout);

@@ -31,6 +31,8 @@ pub trait RenderDevice:
         >,
     > + RenderShaderDevice
     + RenderSwapchainDevice<Swapchain: Surface<Texture = Self::Texture>, Queue = Self::CommandQueue>
+    + Send
+    + Sync
 {
 }
 
@@ -51,6 +53,8 @@ impl<T> RenderDevice for T where
             >,
         > + RenderShaderDevice
         + RenderSwapchainDevice<Swapchain: Surface<Texture = Self::Texture>, Queue = T::CommandQueue>
+        + Send
+        + Sync
 {
 }
 
@@ -133,6 +137,13 @@ impl<D: RenderDevice> ContextDual<D> {
     pub fn call(&self, func: impl Fn(&Context<D>)) {
         func(&self.primary);
         func(&self.secondary);
+    }
+
+    pub fn parallel(&self, func: impl Fn(&Context<D>) + Sync) {
+        std::thread::scope(|s| {
+            s.spawn(|| func(&self.primary));
+            s.spawn(|| func(&self.secondary));
+        });
     }
 
     pub fn call_primary(&self, mut func: impl FnMut(&Context<D>)) {

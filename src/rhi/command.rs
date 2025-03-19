@@ -19,8 +19,9 @@ pub enum Barrier<'a, D: RenderResourceDevice> {
 }
 
 pub trait RenderCommandDevice: RenderResourceDevice {
-    type ResourceUploader: RenderResourceUploader<Device = Self, CommandBuffer: IoCommandBuffer<Device = Self>>;
-    type CommandQueue: RenderCommandQueue<Device = Self, CommandBuffer: RenderCommandBuffer>;
+    type ResourceUploader: RenderResourceUploader<Device = Self, CommandBuffer: IoCommandBuffer<Device = Self>>
+        + Sync;
+    type CommandQueue: RenderCommandQueue<Device = Self, CommandBuffer: RenderCommandBuffer> + Sync;
     type Event;
 
     fn create_command_queue(&self, ty: CommandType, capacity: Option<usize>) -> Self::CommandQueue;

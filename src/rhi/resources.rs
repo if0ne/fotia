@@ -10,10 +10,10 @@ pub trait QueryHeap {
 }
 
 pub trait RenderResourceDevice: Sized {
-    type Buffer: Debug + 'static;
-    type Texture: Debug + 'static;
-    type Sampler: Debug + 'static;
-    type TimestampQuery: QueryHeap + Debug + 'static;
+    type Buffer: Send + Sync + Debug + 'static;
+    type Texture: Send + Sync + Debug + 'static;
+    type Sampler: Send + Sync + Debug + 'static;
+    type TimestampQuery: Send + Sync + QueryHeap + Debug + 'static;
 
     fn create_buffer(&self, desc: BufferDesc) -> Self::Buffer;
     fn destroy_buffer(&self, buffer: Self::Buffer);
