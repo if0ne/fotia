@@ -85,25 +85,20 @@ pub trait RenderCommandBuffer {
 
     fn ty(&self) -> CommandType;
 
-    fn begin(&mut self, device: &Self::Device);
+    fn begin(&self, device: &Self::Device);
 
-    fn set_barriers<'a>(&mut self, barriers: impl IntoIterator<Item = Barrier<'a, Self::Device>>);
+    fn set_barriers<'a>(&self, barriers: impl IntoIterator<Item = Barrier<'a, Self::Device>>);
 
     fn render<'a>(
-        &mut self,
+        &self,
         targets: impl IntoIterator<Item = &'a <Self::Device as RenderResourceDevice>::Texture>,
         depth: Option<&<Self::Device as RenderResourceDevice>::Texture>,
     ) -> Self::RenderEncoder<'_>;
 
-    fn begin_timestamp(
-        &mut self,
-        query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
-    );
-
-    fn end_timestamp(&mut self, query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery);
+    fn write_timestamp(&self, query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery);
 
     fn resolve_timestamp_data(
-        &mut self,
+        &self,
         query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
     ) -> std::ops::Range<usize>;
 }
@@ -121,19 +116,19 @@ pub trait RenderEncoder {
     type RasterPipeline;
     type ShaderArgument;
 
-    fn clear_rt(&mut self, texture: &Self::Texture, color: [f32; 4]);
+    fn clear_rt(&self, texture: &Self::Texture, color: [f32; 4]);
 
-    fn set_viewport(&mut self, viewport: Viewport);
-    fn set_scissor(&mut self, scissor: Scissor);
+    fn set_viewport(&self, viewport: Viewport);
+    fn set_scissor(&self, scissor: Scissor);
 
-    fn set_raster_pipeline(&mut self, pipeline: &Self::RasterPipeline);
-    fn bind_shader_argument(&mut self, argument: &Self::ShaderArgument, dynamic_offset: u64);
+    fn set_raster_pipeline(&self, pipeline: &Self::RasterPipeline);
+    fn bind_shader_argument(&self, argument: &Self::ShaderArgument, dynamic_offset: u64);
 
-    fn bind_vertex_buffer(&mut self, buffer: &Self::Buffer, slot: usize);
-    fn bind_index_buffer(&mut self, buffer: &Self::Buffer, ty: IndexType);
+    fn bind_vertex_buffer(&self, buffer: &Self::Buffer, slot: usize);
+    fn bind_index_buffer(&self, buffer: &Self::Buffer, ty: IndexType);
 
-    fn draw(&mut self, count: u32, start_vertex: u32);
-    fn draw_indexed(&mut self, count: u32, start_index: u32, base_index: u32);
+    fn draw(&self, count: u32, start_vertex: u32);
+    fn draw_indexed(&self, count: u32, start_index: u32, base_index: u32);
 }
 
 #[derive(Debug)]

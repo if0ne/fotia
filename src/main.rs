@@ -166,11 +166,8 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                         encoder.clear_rt(frame.texture, [0.5, 0.32, 0.16, 1.0]);
                     }
 
-                    encoder.begin_timestamp();
-
                     encoder
                         .set_barriers(&[Barrier::Texture(frame.texture, ResourceState::Present)]);
-                    encoder.end_timestamp();
 
                     ctx.commit(encoder);
                     frame.last_access = ctx.submit(CommandType::Graphics);

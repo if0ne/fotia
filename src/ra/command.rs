@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, ops::Range, sync::Arc};
+use std::{cell::RefCell, collections::VecDeque, ops::Range, sync::Arc};
 
 use parking_lot::Mutex;
 
@@ -113,17 +113,19 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
     fn enqueue(&self, cmd_buffer: Self::CommandBuffer) {
         self.timestamp_queries
             .lock()
-            .push_front((cmd_buffer.query, cmd_buffer.range));
+            .push_front((cmd_buffer.query.into_inner(), cmd_buffer.range));
         self.raw.enqueue(cmd_buffer.raw);
     }
 
     fn commit(&self, mut cmd_buffer: Self::CommandBuffer) {
-        cmd_buffer.raw.end_timestamp(&mut cmd_buffer.query);
-        let range = cmd_buffer.raw.resolve_timestamp_data(&mut cmd_buffer.query);
+        cmd_buffer.write_timestamp();
+        let range = cmd_buffer
+            .raw
+            .resolve_timestamp_data(&mut *cmd_buffer.query.borrow_mut());
 
         self.timestamp_queries
             .lock()
-            .push_back((cmd_buffer.query, Some(range)));
+            .push_back((cmd_buffer.query.into_inner(), Some(range)));
         self.raw.commit(cmd_buffer.raw);
     }
 
@@ -155,7 +157,7 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
 pub struct CommandEncoder<D: RenderDevice> {
     pub(super) raw: CommandBuffer<D>,
     pub(super) mapper: Arc<ResourceMapper<D>>,
-    pub(super) query: D::TimestampQuery,
+    pub(super) query: RefCell<D::TimestampQuery>,
     pub(super) range: Option<Range<usize>>,
     pub(super) frequency: f64,
 }
@@ -171,7 +173,7 @@ impl<D: RenderDevice> CommandEncoder<D> {
         Self {
             raw,
             mapper,
-            query,
+            query: RefCell::new(query),
             range,
             frequency,
         }
@@ -274,10 +276,6 @@ pub trait RenderCommandEncoder<D: RenderDevice> {
 
     fn set_barriers(&mut self, barriers: &[Barrier]);
 
-    fn begin_timestamp(&mut self);
-
-    fn end_timestamp(&mut self);
-
     fn render(
         &mut self,
         targets: &[Handle<Texture>],
@@ -293,7 +291,8 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
 
     fn begin(&mut self, ctx: &Context<D>) -> Option<Timings> {
         let timings = self.range.take().map(|range| {
-            let ptr: &[u64] = bytemuck::cast_slice(self.query.read_buffer());
+            let query = self.query.borrow();
+            let ptr: &[u64] = bytemuck::cast_slice(query.read_buffer());
             let ptr = &ptr[range];
 
             let mut prev = ptr[0];
@@ -309,7 +308,7 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
             Timings { timings }
         });
 
-        self.raw.begin_timestamp(&mut self.query);
+        self.write_timestamp();
         self.raw.begin(&ctx.gpu);
 
         timings
@@ -333,19 +332,13 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
         self.raw.set_barriers(barriers);
     }
 
-    fn begin_timestamp(&mut self) {
-        self.raw.begin_timestamp(&mut self.query);
-    }
-
-    fn end_timestamp(&mut self) {
-        self.raw.end_timestamp(&mut self.query);
-    }
-
     fn render(
         &mut self,
         targets: &[Handle<Texture>],
         depth: Option<Handle<Texture>>,
     ) -> Self::RenderEncoder<'_> {
+        self.write_timestamp();
+
         let guard = self.mapper.textures.lock();
         let targets = targets
             .iter()
@@ -355,13 +348,21 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
         let raw = self.raw.render(targets, depth);
 
         Self::RenderEncoder {
+            cmd: self,
             raw,
             mapper: &self.mapper,
         }
     }
 }
 
+impl<D: RenderDevice> CommandEncoder<D> {
+    pub(super) fn write_timestamp(&self) {
+        self.raw.write_timestamp(&mut *self.query.borrow_mut());
+    }
+}
+
 pub struct RenderEncoderImpl<'a, D: RenderDevice> {
+    pub(super) cmd: &'a CommandEncoder<D>,
     pub(super) raw: RenderEncoderType<'a, D>,
     pub(super) mapper: &'a ResourceMapper<D>,
 }
@@ -431,6 +432,12 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
 
     fn draw_indexed(&mut self, count: u32, start_index: u32, base_index: u32) {
         self.raw.draw_indexed(count, start_index, base_index);
+    }
+}
+
+impl<D: RenderDevice> Drop for RenderEncoderImpl<'_, D> {
+    fn drop(&mut self) {
+        self.cmd.write_timestamp();
     }
 }
 

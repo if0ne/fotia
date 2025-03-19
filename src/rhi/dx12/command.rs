@@ -312,14 +312,14 @@ impl RenderCommandBuffer for DxCommandBuffer {
         self.ty
     }
 
-    fn begin(&mut self, device: &Self::Device) {
+    fn begin(&self, device: &Self::Device) {
         self.list.set_descriptor_heaps(&[
             Some(device.descriptors.shader_heap.lock().heap.clone()),
             Some(device.descriptors.sampler_heap.lock().heap.clone()),
         ]);
     }
 
-    fn set_barriers<'a>(&mut self, barriers: impl IntoIterator<Item = Barrier<'a, Self::Device>>) {
+    fn set_barriers<'a>(&self, barriers: impl IntoIterator<Item = Barrier<'a, Self::Device>>) {
         let barriers = barriers
             .into_iter()
             .filter_map(|b| match b {
@@ -362,7 +362,7 @@ impl RenderCommandBuffer for DxCommandBuffer {
     }
 
     fn render<'a>(
-        &mut self,
+        &self,
         targets: impl IntoIterator<Item = &'a <Self::Device as RenderResourceDevice>::Texture>,
         depth: Option<&<Self::Device as RenderResourceDevice>::Texture>,
     ) -> Self::RenderEncoder<'_> {
@@ -378,36 +378,28 @@ impl RenderCommandBuffer for DxCommandBuffer {
         DxRenderEncoder { cmd: self }
     }
 
-    fn begin_timestamp(
-        &mut self,
-        query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
-    ) {
-        self.list
-            .end_query(&query.raw, dx::QueryType::Timestamp, query.cur_index);
-        query.cur_index += 1;
-    }
-
-    fn end_timestamp(
-        &mut self,
-        query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
-    ) {
+    fn write_timestamp(&self, query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery) {
         self.list
             .end_query(&query.raw, dx::QueryType::Timestamp, query.cur_index);
         query.cur_index += 1;
     }
 
     fn resolve_timestamp_data(
-        &mut self,
+        &self,
         query: &mut <Self::Device as RenderResourceDevice>::TimestampQuery,
     ) -> std::ops::Range<usize> {
         let range = 0..query.cur_index;
-        self.list.resolve_query_data(
-            &query.raw,
-            dx::QueryType::Timestamp,
-            range.clone(),
-            &query.buffer.raw,
-            0,
-        );
+
+        if query.cur_index > 0 {
+            self.list.resolve_query_data(
+                &query.raw,
+                dx::QueryType::Timestamp,
+                range.clone(),
+                &query.buffer.raw,
+                0,
+            );
+        }
+
         query.cur_index = 0;
 
         range
@@ -630,7 +622,7 @@ impl GpuEvent for DxFence {
 
 #[derive(Debug)]
 pub struct DxRenderEncoder<'a> {
-    pub(super) cmd: &'a mut DxCommandBuffer,
+    pub(super) cmd: &'a DxCommandBuffer,
 }
 
 impl<'a> RenderEncoder for DxRenderEncoder<'a> {
@@ -639,7 +631,7 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
     type RasterPipeline = DxRasterPipeline;
     type ShaderArgument = DxShaderArgument;
 
-    fn clear_rt(&mut self, texture: &Self::Texture, color: [f32; 4]) {
+    fn clear_rt(&self, texture: &Self::Texture, color: [f32; 4]) {
         if let Some(descriptor) = &texture.descriptor {
             self.cmd
                 .list
@@ -647,7 +639,7 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
         }
     }
 
-    fn set_viewport(&mut self, viewport: Viewport) {
+    fn set_viewport(&self, viewport: Viewport) {
         self.cmd
             .list
             .rs_set_viewports(&[dx::Viewport::from_position_and_size(
@@ -656,14 +648,14 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
             )]);
     }
 
-    fn set_scissor(&mut self, scissor: Scissor) {
+    fn set_scissor(&self, scissor: Scissor) {
         self.cmd.list.rs_set_scissor_rects(&[dx::Rect::default()
             .with_left(scissor.x)
             .with_top(scissor.y)
             .with_size((scissor.w as i32, scissor.h as i32))]);
     }
 
-    fn set_raster_pipeline(&mut self, pipeline: &Self::RasterPipeline) {
+    fn set_raster_pipeline(&self, pipeline: &Self::RasterPipeline) {
         self.cmd.list.set_pipeline_state(&pipeline.raw);
 
         if let Some(layout) = &pipeline.layout {
@@ -671,7 +663,7 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
         }
     }
 
-    fn bind_shader_argument(&mut self, argument: &Self::ShaderArgument, dynamic_offset: u64) {
+    fn bind_shader_argument(&self, argument: &Self::ShaderArgument, dynamic_offset: u64) {
         if let Some(d) = &argument.views {
             self.cmd.list.set_graphics_root_descriptor_table(0, d.gpu);
         }
@@ -688,7 +680,7 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
         }
     }
 
-    fn bind_vertex_buffer(&mut self, buffer: &Self::Buffer, slot: usize) {
+    fn bind_vertex_buffer(&self, buffer: &Self::Buffer, slot: usize) {
         self.cmd.list.ia_set_vertex_buffers(
             slot as u32,
             &[dx::VertexBufferView::new(
@@ -699,7 +691,7 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
         );
     }
 
-    fn bind_index_buffer(&mut self, buffer: &Self::Buffer, ty: IndexType) {
+    fn bind_index_buffer(&self, buffer: &Self::Buffer, ty: IndexType) {
         self.cmd
             .list
             .ia_set_index_buffer(Some(&dx::IndexBufferView::new(
@@ -712,11 +704,11 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
             )));
     }
 
-    fn draw(&mut self, count: u32, start_vertex: u32) {
+    fn draw(&self, count: u32, start_vertex: u32) {
         self.cmd.list.draw_instanced(count, 1, start_vertex, 0);
     }
 
-    fn draw_indexed(&mut self, count: u32, start_index: u32, base_vertex: u32) {
+    fn draw_indexed(&self, count: u32, start_index: u32, base_vertex: u32) {
         self.cmd
             .list
             .draw_indexed_instanced(count, 1, start_index, base_vertex as i32, 0);
