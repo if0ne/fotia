@@ -16,13 +16,13 @@ cbuffer GlobalBuffer : register(b0, space0) {
     Globals g_data;
 }
 
-cbuffer LightBuffer : register(b1, space1)
+cbuffer LightBuffer : register(b0, space1)
 {
     DirectionalLight dir_light;
     AmbientLight ambient_light;
 }
 
-cbuffer CsmBuffer : register(b2, space2) {
+cbuffer CsmBuffer : register(b0, space2) {
     CsmData csm_data;
 }
 

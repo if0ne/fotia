@@ -5,7 +5,7 @@ cbuffer GlobalBuffer : register(b0, space0) {
     Globals g_data;
 }
 
-cbuffer ObjectTransform : register(b1, space1)
+cbuffer ObjectTransform : register(b0, space1)
 {
     matrix transform;
 }

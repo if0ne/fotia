@@ -204,11 +204,12 @@ impl RenderShaderDevice for DxDevice {
         let input_element_desc = desc
             .input_elements
             .iter()
-            .map(|el| {
+            .enumerate()
+            .map(|(i, el)| {
                 dx::InputElementDesc::per_vertex(
                     map_semantic(el.semantic),
                     map_vertex_format(el.format),
-                    el.slot,
+                    i as _,
                 )
             })
             .collect::<SmallVec<[_; 16]>>();

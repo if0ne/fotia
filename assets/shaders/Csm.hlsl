@@ -3,7 +3,7 @@ cbuffer CsmMatrix : register(b0, space0)
     matrix proj_view;
 }
 
-cbuffer ObjectTransform : register(b1, space1)
+cbuffer ObjectTransform : register(b0, space1)
 {
     matrix transform;
 }

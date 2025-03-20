@@ -3,9 +3,10 @@ use oxidx::dx;
 use crate::rhi::{
     command::CommandType,
     resources::{TextureDesc, TextureType, TextureUsages},
-    shader::StaticSampler,
+    shader::{SamplerType, StaticSampler},
     types::{
-        AddressMode, CullMode, DepthOp, Filter, Format, ResourceState, VertexAttribute, VertexType,
+        AddressMode, ComparisonFunc, CullMode, DepthOp, Filter, Format, ResourceState,
+        VertexAttribute, VertexType,
     },
 };
 
@@ -26,6 +27,8 @@ pub(super) fn map_format(format: Format) -> dx::Format {
         Format::Rgba32 => dx::Format::Rgba32Float,
         Format::Rgba8Unorm => dx::Format::Rgba8Unorm,
         Format::Rgba8 => dx::Format::Rgba8Uint,
+        Format::D24S8 => dx::Format::D24UnormS8Uint,
+        Format::D32 => dx::Format::D32Float,
     }
 }
 
@@ -93,10 +96,25 @@ pub(super) fn map_texture_flags(
 
 pub(super) fn map_static_sampler(sampler: &StaticSampler) -> dx::StaticSamplerDesc {
     dx::StaticSamplerDesc::default()
-        .with_filter(map_filter(sampler.filter))
+        .with_filter(map_filter_ty(sampler.ty))
         .with_address_u(map_address_mode(sampler.address_mode))
         .with_address_v(map_address_mode(sampler.address_mode))
         .with_address_w(map_address_mode(sampler.address_mode))
+        .with_comparison_func(map_comp_func_ty(sampler.ty))
+}
+
+pub(super) fn map_filter_ty(filter: SamplerType) -> dx::Filter {
+    match filter {
+        SamplerType::Sample(filter) => map_filter(filter),
+        SamplerType::Comparasion(_) => dx::Filter::ComparisonLinear,
+    }
+}
+
+pub(super) fn map_comp_func_ty(filter: SamplerType) -> dx::ComparisonFunc {
+    match filter {
+        SamplerType::Sample(_) => dx::ComparisonFunc::default(),
+        SamplerType::Comparasion(comparison_func) => map_comparison_func(comparison_func),
+    }
 }
 
 pub(super) fn map_filter(filter: Filter) -> dx::Filter {
@@ -104,6 +122,16 @@ pub(super) fn map_filter(filter: Filter) -> dx::Filter {
         Filter::Point => dx::Filter::Point,
         Filter::Linear => dx::Filter::Linear,
         Filter::Anisotropic => dx::Filter::Anisotropic,
+    }
+}
+
+pub(super) fn map_comparison_func(func: ComparisonFunc) -> dx::ComparisonFunc {
+    match func {
+        ComparisonFunc::None => dx::ComparisonFunc::None,
+        ComparisonFunc::Never => dx::ComparisonFunc::Never,
+        ComparisonFunc::LessEqual => dx::ComparisonFunc::LessEqual,
+        ComparisonFunc::Equal => dx::ComparisonFunc::Equal,
+        ComparisonFunc::GreaterEqual => dx::ComparisonFunc::GreaterEqual,
     }
 }
 
@@ -121,6 +149,7 @@ pub(super) fn map_semantic(semantic: VertexAttribute) -> dx::SemanticName {
         VertexAttribute::Color(n) => dx::SemanticName::Color(n),
         VertexAttribute::Normal(n) => dx::SemanticName::Normal(n),
         VertexAttribute::Tangent(n) => dx::SemanticName::Tangent(n),
+        VertexAttribute::Uv(n) => dx::SemanticName::TexCoord(n),
     }
 }
 
