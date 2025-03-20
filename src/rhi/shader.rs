@@ -2,7 +2,10 @@ use std::{borrow::Cow, fmt::Debug, path::Path};
 
 use super::{
     resources::RenderResourceDevice,
-    types::{AddressMode, CullMode, DepthStateDesc, Filter, Format, InputElementDesc, ShaderType},
+    types::{
+        AddressMode, ComparisonFunc, CullMode, DepthStateDesc, Filter, Format, InputElementDesc,
+        ShaderType,
+    },
 };
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -63,8 +66,14 @@ pub struct BindingSet<'a> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StaticSampler {
-    pub filter: Filter,
+    pub ty: SamplerType,
     pub address_mode: AddressMode,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SamplerType {
+    Sample(Filter),
+    Comparasion(ComparisonFunc),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -113,5 +122,5 @@ pub struct RasterPipelineDesc<'a, D: RenderShaderDevice> {
     pub cull_mode: CullMode,
 
     pub vs: &'a CompiledShader,
-    pub shaders: &'a [CompiledShader],
+    pub shaders: &'a [&'a CompiledShader],
 }

@@ -144,7 +144,7 @@ pub struct RasterPipelineDesc<'a> {
     pub cull_mode: CullMode,
 
     pub vs: &'a CompiledShader,
-    pub shaders: &'a [CompiledShader],
+    pub shaders: &'a [&'a CompiledShader],
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

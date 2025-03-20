@@ -10,11 +10,11 @@ cbuffer GlobalBuffer : register(b0, space0) {
 Texture2D diffuse_t : register(t0, space1);
 Texture2D normal_t : register(t1, space1);
 
-cbuffer MaterialBuffer : register(b1, space1) {
+cbuffer MaterialBuffer : register(b0, space1) {
     Material material_data;
 }
 
-cbuffer ObjectTransform : register(b2, space2)
+cbuffer ObjectTransform : register(b0, space2)
 {
     matrix transform;
 }
