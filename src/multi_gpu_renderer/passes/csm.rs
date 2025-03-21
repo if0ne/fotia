@@ -37,6 +37,7 @@ pub struct CascadedShadowMapsPass<D: RenderDevice> {
     pub argument: Handle<ShaderArgument>,
 
     pub gpu_csm_proj_view_buffer: Handle<Buffer>,
+    pub local_argument: Handle<ShaderArgument>,
 
     pub dsv: Handle<Texture>,
     pub srv: Handle<Texture>,
@@ -60,6 +61,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
         let gpu_csm_proj_view_buffer = rs.create_buffer_handle();
 
         let argument = rs.create_shader_argument_handle();
+        let local_argument = rs.create_shader_argument_handle();
 
         ctx.bind_texture(
             dsv,
@@ -108,6 +110,15 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
             },
         );
 
+        ctx.bind_shader_argument(
+            local_argument,
+            ShaderArgumentDesc {
+                views: &[],
+                samplers: &[],
+                dynamic_buffer: Some(gpu_csm_proj_view_buffer),
+            },
+        );
+
         Self {
             rs,
             ctx,
@@ -116,6 +127,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
             gpu_csm_buffer,
             argument,
             gpu_csm_proj_view_buffer,
+            local_argument,
             dsv,
             srv,
             pso: psos.csm_pass,
@@ -159,7 +171,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
                 });
                 encoder.bind_shader_argument(
                     0,
-                    self.argument,
+                    self.local_argument,
                     (size_of::<glam::Mat4>() * (frame_idx * 4 + i as usize)) as u64,
                 );
 

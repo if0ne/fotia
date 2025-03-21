@@ -141,8 +141,11 @@ impl<D: RenderDevice> PsoCollection<D> {
                 PipelineLayoutDesc {
                     sets: &[
                         BindingSet {
+                            entries: &[],
+                            use_dynamic_buffer: true,
+                        },
+                        BindingSet {
                             entries: &[
-                                BindingEntry::new(BindingType::Srv, 1),
                                 BindingEntry::new(BindingType::Srv, 1),
                                 BindingEntry::new(BindingType::Srv, 1),
                                 BindingEntry::new(BindingType::Srv, 1),
@@ -150,11 +153,7 @@ impl<D: RenderDevice> PsoCollection<D> {
                             use_dynamic_buffer: true,
                         },
                         BindingSet {
-                            entries: &[],
-                            use_dynamic_buffer: true,
-                        },
-                        BindingSet {
-                            entries: &[],
+                            entries: &[BindingEntry::new(BindingType::Srv, 1)],
                             use_dynamic_buffer: true,
                         },
                     ],
@@ -200,7 +199,7 @@ impl<D: RenderDevice> PsoCollection<D> {
                 PipelineLayoutDesc {
                     sets: &[BindingSet {
                         entries: &[BindingEntry::new(BindingType::Srv, 1)],
-                        use_dynamic_buffer: true,
+                        use_dynamic_buffer: false,
                     }],
                     static_samplers: &[StaticSampler {
                         ty: SamplerType::Sample(Filter::Linear),

@@ -7,7 +7,9 @@ use crate::{
         command::{RenderCommandContext, RenderCommandEncoder, RenderEncoder},
         context::{Context, RenderDevice},
         resources::Texture,
-        shader::{RasterPipeline, RenderShaderContext, ShaderArgument, ShaderArgumentDesc},
+        shader::{
+            RasterPipeline, RenderShaderContext, ShaderArgument, ShaderArgumentDesc, ShaderEntry,
+        },
         system::RenderSystem,
     },
     rhi::{
@@ -22,6 +24,7 @@ pub struct GammaCorrectionPass<D: RenderDevice> {
     pub pso: Handle<RasterPipeline>,
 
     pub argument: Handle<ShaderArgument>,
+    pub accum_srv: Handle<Texture>,
 
     pub extent: [u32; 2],
 }
@@ -31,6 +34,7 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
         rs: Arc<RenderSystem>,
         ctx: Arc<Context<D>>,
         psos: &PsoCollection<D>,
+        accum_srv: Handle<Texture>,
         extent: [u32; 2],
     ) -> Self {
         let argument = rs.create_shader_argument_handle();
@@ -38,7 +42,7 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
         ctx.bind_shader_argument(
             argument,
             ShaderArgumentDesc {
-                views: &[],
+                views: &[ShaderEntry::Srv(accum_srv)],
                 samplers: &[],
                 dynamic_buffer: None,
             },
@@ -49,6 +53,7 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
             ctx,
             pso: psos.gamma_corr_pass,
             argument,
+            accum_srv,
             extent,
         }
     }
@@ -68,7 +73,7 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
             });
             encoder.set_render_pipeline(self.pso);
             encoder.set_topology(GeomTopology::Triangles);
-            encoder.bind_shader_argument(0, self.argument, 0);
+            //encoder.bind_shader_argument(0, self.argument, 0);
 
             encoder.draw(3, 0);
         }
@@ -79,12 +84,10 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
     pub fn resize(&mut self, extent: [u32; 2]) {
         self.extent = extent;
 
-        self.ctx.unbind_shader_argument(self.argument);
-
         self.ctx.bind_shader_argument(
             self.argument,
             ShaderArgumentDesc {
-                views: &[],
+                views: &[ShaderEntry::Srv(self.accum_srv)],
                 samplers: &[],
                 dynamic_buffer: None,
             },

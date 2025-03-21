@@ -4,23 +4,24 @@
 #include "Pbr.hlsl"
 #include "FullscreenVS.hlsl"
 
-
-Texture2D diffuse_t : register(t0, space0);
-Texture2D normal_t : register(t1, space0);
-Texture2D material_t : register(t2, space0);
-Texture2D csm_t : register(t3, space0);
-
 SamplerComparisonState comp_shadow_s : register(s0, space0);
 
 cbuffer GlobalBuffer : register(b0, space0) {
     Globals g_data;
 }
 
+Texture2D diffuse_t : register(t0, space1);
+Texture2D normal_t : register(t1, space1);
+Texture2D material_t : register(t2, space1);
+
+
 cbuffer LightBuffer : register(b0, space1)
 {
     DirectionalLight dir_light;
     AmbientLight ambient_light;
 }
+
+Texture2D csm_t : register(t0, space2);
 
 cbuffer CsmBuffer : register(b0, space2) {
     CsmData csm_data;

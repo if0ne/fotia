@@ -127,7 +127,6 @@ impl RenderShaderDevice for DxDevice {
         &self,
         desc: ShaderArgumentDesc<'a, Self, V, S>,
     ) -> Self::ShaderArgument {
-        let mut dynamic_index = 0;
         let desc_views = desc.views.into_iter();
         let desc_samplers = desc.samplers.into_iter();
 
@@ -139,16 +138,13 @@ impl RenderShaderDevice for DxDevice {
 
             for (i, view) in desc_views.into_iter().enumerate() {
                 match view {
-                    ShaderEntry::Cbv(buffer, buffer_size) => {
-                        dynamic_index += 1;
-                        self.gpu.create_constant_buffer_view(
-                            Some(&dx::ConstantBufferViewDesc::new(
-                                buffer.raw.get_gpu_virtual_address(),
-                                buffer_size,
-                            )),
-                            views.cpu.advance(i, size),
-                        )
-                    }
+                    ShaderEntry::Cbv(buffer, buffer_size) => self.gpu.create_constant_buffer_view(
+                        Some(&dx::ConstantBufferViewDesc::new(
+                            buffer.raw.get_gpu_virtual_address(),
+                            buffer_size,
+                        )),
+                        views.cpu.advance(i, size),
+                    ),
                     ShaderEntry::Srv(texture) | ShaderEntry::Uav(texture) => self
                         .create_texture_view(
                             views.cpu.advance(i, size),
@@ -186,7 +182,6 @@ impl RenderShaderDevice for DxDevice {
             views,
             samplers,
             dynamic_address,
-            dynamic_index,
         }
     }
 
@@ -310,5 +305,4 @@ pub struct DxShaderArgument {
     pub(super) views: Option<Descriptor>,
     pub(super) samplers: Option<Descriptor>,
     pub(super) dynamic_address: Option<u64>,
-    pub(super) dynamic_index: u32,
 }

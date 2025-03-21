@@ -66,7 +66,7 @@ pub trait IoCommandBuffer {
     fn load_to_buffer(
         &mut self,
         device: &Self::Device,
-        buffer: &<Self::Device as RenderResourceDevice>::Buffer,
+        buffer: &mut <Self::Device as RenderResourceDevice>::Buffer,
         data: &'_ [u8],
     );
     fn load_to_texture(

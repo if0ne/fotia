@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::{ffi::CString, sync::Arc};
 
 use oxidx::dx::{self, IDevice, IDeviceChildExt, IResource};
 use parking_lot::Mutex;
@@ -126,7 +126,7 @@ impl RenderResourceDevice for DxDevice {
 
         DxTexture {
             raw: texture.raw.clone(),
-            state: Mutex::new(dx::ResourceStates::Common),
+            state: Arc::clone(&texture.state),
             desc: texture.desc.clone(),
             flavor: match &texture.flavor {
                 TextureFlavor::Local => TextureFlavor::Local,
@@ -261,7 +261,7 @@ impl Buffer for DxBuffer {
 #[derive(Debug)]
 pub struct DxTexture {
     pub(super) raw: dx::Resource,
-    pub(super) state: Mutex<dx::ResourceStates>,
+    pub(super) state: Arc<Mutex<dx::ResourceStates>>,
     pub(super) desc: TextureDesc,
     pub(super) flavor: TextureFlavor,
 
@@ -298,13 +298,21 @@ impl DxDevice {
             None,
         );
 
+        let state = if desc.usage.contains(TextureUsages::RenderTarget) {
+            dx::ResourceStates::RenderTarget
+        } else if desc.usage.contains(TextureUsages::DepthTarget) {
+            dx::ResourceStates::DepthWrite
+        } else {
+            dx::ResourceStates::Common
+        };
+
         let raw = self
             .gpu
             .create_committed_resource(
                 &dx::HeapProperties::default(),
                 dx::HeapFlags::empty(),
                 &raw_desc,
-                dx::ResourceStates::Common,
+                state,
                 None,
             )
             .expect("Failed to create buffer");
@@ -331,7 +339,7 @@ impl DxDevice {
 
         DxTexture {
             raw,
-            state: Mutex::new(dx::ResourceStates::Common),
+            state: Arc::new(Mutex::new(state)),
             desc,
             flavor: TextureFlavor::Local,
             size,
@@ -389,7 +397,7 @@ impl DxDevice {
 
             DxTexture {
                 raw: cross_res,
-                state: Mutex::new(dx::ResourceStates::Common),
+                state: Arc::new(Mutex::new(dx::ResourceStates::Common)),
                 desc,
                 flavor: TextureFlavor::CrossAdapter { heap },
                 size,
@@ -451,7 +459,7 @@ impl DxDevice {
 
             DxTexture {
                 raw,
-                state: Mutex::new(dx::ResourceStates::Common),
+                state: Arc::new(Mutex::new(dx::ResourceStates::Common)),
                 desc,
                 flavor: TextureFlavor::Binded {
                     heap,

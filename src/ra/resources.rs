@@ -51,11 +51,11 @@ pub trait RenderResourceContext {
 
 impl<D: RenderDevice> RenderResourceContext for Context<D> {
     fn bind_buffer(&self, handle: Handle<Buffer>, desc: BufferDesc, init_data: Option<&[u8]>) {
-        let buffer = self.gpu.create_buffer(desc);
+        let mut buffer = self.gpu.create_buffer(desc);
 
         if let Some(init_data) = init_data {
             let mut cmd = self.uploader.create_command_buffer(&self.gpu);
-            cmd.load_to_buffer(&self.gpu, &buffer, init_data);
+            cmd.load_to_buffer(&self.gpu, &mut buffer, init_data);
             self.uploader.commit(cmd);
             self.uploader.wait_on_cpu(self.uploader.submit(&self.gpu));
         }

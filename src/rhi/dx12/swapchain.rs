@@ -1,4 +1,4 @@
-use std::num::NonZero;
+use std::{num::NonZero, sync::Arc};
 
 use oxidx::dx::{self, IDevice, IFactory4, ISwapchain1, ISwapchain3};
 use parking_lot::Mutex;
@@ -117,7 +117,7 @@ impl RenderSwapchainDevice for DxDevice {
                 descriptor,
                 view: TextureViewDesc::default().with_view_type(TextureViewType::RenderTarget),
                 _is_view: false,
-                state: Mutex::new(dx::ResourceStates::Common),
+                state: Arc::new(Mutex::new(dx::ResourceStates::Common)),
             };
 
             swapchain.resources.push(SwapchainFrame {
