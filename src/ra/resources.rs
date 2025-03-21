@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use parking_lot::Mutex;
 
 use crate::{
@@ -81,7 +79,7 @@ impl<D: RenderDevice> RenderResourceContext for Context<D> {
             panic!("buffer doesn't exist")
         };
 
-        let mut buffer = &mut buffer.map_mut()[offset..(offset + data.len())];
+        let buffer = &mut buffer.map_mut()[offset..(offset + data.len())];
         buffer.clone_from_slice(data);
     }
 
