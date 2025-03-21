@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 bitflags = "2.9.0"
 bytemuck = "1.22.0"
+glam = "0.30.1"
+hecs = "0.10.5"
 image = "0.25.5"
 parking_lot = "0.12.3"
 range-alloc = "0.1.4"
