@@ -37,7 +37,12 @@ pub trait RenderResourceContext {
         desc: TextureViewDesc,
     );
 
-    fn open_texture_handle(&self, handle: Handle<Texture>, other: &Self);
+    fn open_texture_handle(
+        &self,
+        handle: Handle<Texture>,
+        other: &Self,
+        overrided_view: Option<TextureViewDesc>,
+    );
 
     fn bind_sampler(&self, handle: Handle<Sampler>, desc: SamplerDesc);
     fn unbind_sampler(&self, handle: Handle<Sampler>);
@@ -107,13 +112,18 @@ impl<D: RenderDevice> RenderResourceContext for Context<D> {
         }
     }
 
-    fn open_texture_handle(&self, handle: Handle<Texture>, other: &Self) {
+    fn open_texture_handle(
+        &self,
+        handle: Handle<Texture>,
+        other: &Self,
+        overrided_view: Option<TextureViewDesc>,
+    ) {
         let mut guard = other.mapper.textures.lock();
         let Some(texture) = guard.get(handle) else {
             panic!("texture doesn't exist")
         };
 
-        let texture = self.gpu.open_texture(texture, &other.gpu);
+        let texture = self.gpu.open_texture(texture, &other.gpu, overrided_view);
         guard.set(handle, texture);
     }
 

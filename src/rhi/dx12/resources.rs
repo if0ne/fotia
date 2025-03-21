@@ -147,7 +147,12 @@ impl RenderResourceDevice for DxDevice {
         }
     }
 
-    fn open_texture(&self, texture: &Self::Texture, other_gpu: &Self) -> Self::Texture {
+    fn open_texture(
+        &self,
+        texture: &Self::Texture,
+        other_gpu: &Self,
+        overrided_view: Option<TextureViewDesc>,
+    ) -> Self::Texture {
         let heap = match &texture.flavor {
             TextureFlavor::Local => panic!("Texture is local, can not open handle"),
             TextureFlavor::CrossAdapter { heap } => heap,
@@ -177,6 +182,7 @@ impl RenderResourceDevice for DxDevice {
                         .unwrap_or(&std::borrow::Cow::Borrowed("Unnamed"))
                 ))),
             open_heap,
+            overrided_view,
         )
     }
 
@@ -336,7 +342,12 @@ impl DxDevice {
         }
     }
 
-    fn create_shared_texture(&self, desc: TextureDesc, heap: dx::Heap) -> DxTexture {
+    fn create_shared_texture(
+        &self,
+        desc: TextureDesc,
+        heap: dx::Heap,
+        overrided_view: Option<TextureViewDesc>,
+    ) -> DxTexture {
         let raw_desc = map_texture_desc(&desc, self.desc.is_cross_adapter_texture_supported);
 
         let cross_adapter = raw_desc
@@ -355,7 +366,7 @@ impl DxDevice {
                 .create_placed_resource(&heap, 0, &raw_desc, dx::ResourceStates::Common, None)
                 .expect("failed to create cross texture");
 
-            let view = desc.to_default_view();
+            let view = overrided_view.unwrap_or_else(|| desc.to_default_view());
 
             let descriptor = if desc.usage.contains(TextureUsages::RenderTarget) {
                 Some(self.descriptors.allocate(dx::DescriptorHeapType::Rtv, 1))
@@ -399,7 +410,7 @@ impl DxDevice {
                 )
                 .expect("Failed to create buffer");
 
-            let view = desc.to_default_view();
+            let view = overrided_view.unwrap_or_else(|| desc.to_default_view());
 
             let descriptor = if desc.usage.contains(TextureUsages::RenderTarget) {
                 Some(self.descriptors.allocate(dx::DescriptorHeapType::Rtv, 1))

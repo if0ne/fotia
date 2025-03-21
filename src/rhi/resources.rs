@@ -23,7 +23,12 @@ pub trait RenderResourceDevice: Sized {
 
     fn create_texture_view(&self, texture: &Self::Texture, desc: TextureViewDesc) -> Self::Texture;
 
-    fn open_texture(&self, texture: &Self::Texture, other_gpu: &Self) -> Self::Texture;
+    fn open_texture(
+        &self,
+        texture: &Self::Texture,
+        other_gpu: &Self,
+        overrided_view: Option<TextureViewDesc>,
+    ) -> Self::Texture;
 
     fn create_sampler(&self, desc: SamplerDesc) -> Self::Sampler;
     fn destroy_sampler(&self, sampler: Self::Sampler);
