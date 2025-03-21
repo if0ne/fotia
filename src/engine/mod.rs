@@ -1,4 +1,5 @@
 use glam;
+use hecs::Entity;
 
 use crate::{
     collections::handle::Handle,
@@ -7,6 +8,12 @@ use crate::{
         shader::ShaderArgument,
     },
 };
+
+#[derive(Clone, Debug)]
+pub struct ParentComponent {
+    entity: Entity,
+    from_child: TransformComponent,
+}
 
 #[derive(Clone, Debug)]
 pub struct TransformComponent {
