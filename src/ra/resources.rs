@@ -1,10 +1,12 @@
+use std::io::Write;
+
 use parking_lot::Mutex;
 
 use crate::{
     collections::{handle::Handle, sparse_array::SparseArray},
     rhi::{
         command::{IoCommandBuffer, RenderCommandQueue},
-        resources::{BufferDesc, SamplerDesc, TextureDesc, TextureViewDesc},
+        resources::{Buffer as _, BufferDesc, SamplerDesc, TextureDesc, TextureViewDesc},
     },
 };
 
@@ -26,6 +28,7 @@ pub trait RenderResourceContext {
     // Resources
     fn bind_buffer(&self, handle: Handle<Buffer>, desc: BufferDesc, init_data: Option<&[u8]>);
     fn unbind_buffer(&self, handle: Handle<Buffer>);
+    fn update_buffer<T: Clone>(&self, handle: Handle<Buffer>, offset: usize, data: &[T]);
 
     fn bind_texture(&self, handle: Handle<Texture>, desc: TextureDesc, init_data: Option<&[u8]>);
     fn unbind_texture(&self, handle: Handle<Texture>);
@@ -70,6 +73,16 @@ impl<D: RenderDevice> RenderResourceContext for Context<D> {
         };
 
         self.gpu.destroy_buffer(buffer);
+    }
+
+    fn update_buffer<T: Clone>(&self, handle: Handle<Buffer>, offset: usize, data: &[T]) {
+        let mut guard = self.mapper.buffers.lock();
+        let Some(buffer) = guard.get_mut(handle) else {
+            panic!("buffer doesn't exist")
+        };
+
+        let mut buffer = &mut buffer.map_mut()[offset..(offset + data.len())];
+        buffer.clone_from_slice(data);
     }
 
     fn bind_texture(&self, handle: Handle<Texture>, desc: TextureDesc, init_data: Option<&[u8]>) {
