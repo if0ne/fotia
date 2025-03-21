@@ -94,8 +94,6 @@ impl<D: RenderDevice> ZPass<D> {
     }
 
     pub fn resize(&mut self, extent: [u32; 2]) {
-        self.ctx.unbind_texture(self.depth);
-
         self.ctx.bind_texture(
             self.depth,
             TextureDesc::new_2d(extent, Format::D24S8, TextureUsages::DepthTarget)
