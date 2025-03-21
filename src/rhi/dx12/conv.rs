@@ -5,8 +5,8 @@ use crate::rhi::{
     resources::{TextureDesc, TextureType, TextureUsages},
     shader::{SamplerType, StaticSampler},
     types::{
-        AddressMode, ComparisonFunc, CullMode, DepthOp, Filter, Format, ResourceState,
-        VertexAttribute, VertexType,
+        AddressMode, ComparisonFunc, CullMode, DepthOp, Filter, Format, GeomTopology,
+        ResourceState, VertexAttribute, VertexType,
     },
 };
 
@@ -185,5 +185,13 @@ pub(super) fn map_resource_state(state: ResourceState) -> dx::ResourceStates {
         ResourceState::Common => dx::ResourceStates::Common,
         ResourceState::RenderTarget => dx::ResourceStates::RenderTarget,
         ResourceState::Present => dx::ResourceStates::Present,
+        ResourceState::DepthWrite => dx::ResourceStates::DepthWrite,
+    }
+}
+
+pub(super) fn map_geom_topology(topo: GeomTopology) -> dx::PrimitiveTopology {
+    match topo {
+        GeomTopology::Triangles => dx::PrimitiveTopology::Triangle,
+        GeomTopology::Lines => dx::PrimitiveTopology::Line,
     }
 }

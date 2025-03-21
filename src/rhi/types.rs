@@ -137,6 +137,13 @@ pub enum ResourceState {
     Common,
     RenderTarget,
     Present,
+    DepthWrite,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub enum GeomTopology {
+    Triangles,
+    Lines,
 }
 
 #[derive(Clone, Debug)]

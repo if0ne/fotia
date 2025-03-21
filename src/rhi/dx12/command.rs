@@ -19,11 +19,11 @@ use crate::rhi::{
         RenderCommandQueue, RenderEncoder, RenderResourceUploader, SyncPoint,
     },
     resources::{BufferDesc, BufferUsages, MemoryLocation, QueryHeap, RenderResourceDevice},
-    types::{IndexType, Scissor, Timings, Viewport},
+    types::{GeomTopology, IndexType, Scissor, Timings, Viewport},
 };
 
 use super::{
-    conv::{map_command_buffer_type, map_resource_state},
+    conv::{map_command_buffer_type, map_geom_topology, map_resource_state},
     device::DxDevice,
     resources::{DxBuffer, DxTexture, DxTimestampQuery},
     shader::{DxRasterPipeline, DxShaderArgument},
@@ -673,6 +673,18 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
         }
     }
 
+    fn clear_depth(&self, texture: &Self::Texture, depth: f32) {
+        if let Some(descriptor) = &texture.descriptor {
+            self.cmd.list.clear_depth_stencil_view(
+                descriptor.cpu,
+                dx::ClearFlags::Depth,
+                depth,
+                0,
+                &[],
+            );
+        }
+    }
+
     fn set_viewport(&self, viewport: Viewport) {
         self.cmd
             .list
@@ -689,6 +701,12 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
             .with_size((scissor.w as i32, scissor.h as i32))]);
     }
 
+    fn set_topology(&self, topology: GeomTopology) {
+        self.cmd
+            .list
+            .ia_set_primitive_topology(map_geom_topology(topology));
+    }
+
     fn set_raster_pipeline(&self, pipeline: &Self::RasterPipeline) {
         self.cmd.list.set_pipeline_state(&pipeline.raw);
 
@@ -697,20 +715,28 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
         }
     }
 
-    fn bind_shader_argument(&self, argument: &Self::ShaderArgument, dynamic_offset: u64) {
+    fn bind_shader_argument(
+        &self,
+        space: u32,
+        argument: &Self::ShaderArgument,
+        dynamic_offset: u64,
+    ) {
         if let Some(d) = &argument.views {
-            self.cmd.list.set_graphics_root_descriptor_table(0, d.gpu);
+            self.cmd
+                .list
+                .set_graphics_root_descriptor_table(space, d.gpu);
         }
 
         if let Some(d) = &argument.samplers {
-            self.cmd.list.set_graphics_root_descriptor_table(0, d.gpu);
+            self.cmd
+                .list
+                .set_graphics_root_descriptor_table(space, d.gpu);
         }
 
         if let Some(address) = &argument.dynamic_address {
-            self.cmd.list.set_graphics_root_constant_buffer_view(
-                argument.dynamic_index,
-                *address + dynamic_offset,
-            );
+            self.cmd
+                .list
+                .set_graphics_root_constant_buffer_view(space, *address + dynamic_offset);
         }
     }
 

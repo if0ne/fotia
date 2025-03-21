@@ -8,7 +8,7 @@ use crate::{
             CommandType, RenderCommandBuffer, RenderCommandDevice, RenderCommandQueue,
             RenderEncoder as _, SyncPoint,
         },
-        types::{IndexType, ResourceState, Scissor, Timings, Viewport},
+        types::{GeomTopology, IndexType, ResourceState, Scissor, Timings, Viewport},
     },
 };
 
@@ -257,12 +257,19 @@ pub struct RenderEncoderImpl<'a, D: RenderDevice> {
 
 pub trait RenderEncoder {
     fn clear_rt(&mut self, texture: Handle<Texture>, color: [f32; 4]);
+    fn clear_depth(&mut self, texture: Handle<Texture>, depth: f32);
 
     fn set_viewport(&mut self, viewport: Viewport);
     fn set_scissor(&mut self, scissor: Scissor);
+    fn set_topology(&self, topology: GeomTopology);
 
     fn set_render_pipeline(&mut self, pipeline: Handle<RasterPipeline>);
-    fn bind_shader_argument(&mut self, argument: Handle<ShaderArgument>, dynamic_offset: u64);
+    fn bind_shader_argument(
+        &mut self,
+        space: u32,
+        argument: Handle<ShaderArgument>,
+        dynamic_offset: u64,
+    );
 
     fn bind_vertex_buffer(&mut self, buffer: Handle<Buffer>, slot: usize);
     fn bind_index_buffer(&mut self, buffer: Handle<Buffer>, ty: IndexType);
@@ -278,12 +285,22 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
             .clear_rt(guard.get(texture).expect("failed to get texture"), color);
     }
 
+    fn clear_depth(&mut self, texture: Handle<Texture>, depth: f32) {
+        let guard = self.mapper.textures.lock();
+        self.raw
+            .clear_depth(guard.get(texture).expect("failed to get texture"), depth);
+    }
+
     fn set_viewport(&mut self, viewport: Viewport) {
         self.raw.set_viewport(viewport);
     }
 
     fn set_scissor(&mut self, scissor: Scissor) {
         self.raw.set_scissor(scissor);
+    }
+
+    fn set_topology(&self, topology: GeomTopology) {
+        self.raw.set_topology(topology);
     }
 
     fn set_render_pipeline(&mut self, pipeline: Handle<RasterPipeline>) {
@@ -293,7 +310,12 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
         self.raw.set_raster_pipeline(pipeline);
     }
 
-    fn bind_shader_argument(&mut self, argument: Handle<ShaderArgument>, dynamic_offset: u64) {
+    fn bind_shader_argument(
+        &mut self,
+        space: u32,
+        argument: Handle<ShaderArgument>,
+        dynamic_offset: u64,
+    ) {
         let guard = self.mapper.shader_arguments.lock();
         let argument = guard.get(argument).expect("failed to get shader argument");
 
