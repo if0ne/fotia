@@ -1,14 +1,14 @@
 use std::ffi::CString;
 
 use oxidx::dx::{self, IDevice, IDeviceChildExt, IResource};
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::Mutex;
 
 use crate::rhi::{
     command::CommandType,
     dx12::conv::map_texture_desc,
     resources::{
-        BufferDesc, BufferUsages, MemoryLocation, QueryHeap, RenderResourceDevice, SamplerDesc,
-        TextureDesc, TextureType, TextureUsages, TextureViewDesc, TextureViewType,
+        Buffer, BufferDesc, BufferUsages, MemoryLocation, QueryHeap, RenderResourceDevice,
+        SamplerDesc, TextureDesc, TextureType, TextureUsages, TextureViewDesc, TextureViewType,
     },
 };
 
@@ -69,7 +69,6 @@ impl RenderResourceDevice for DxDevice {
             raw,
             desc,
             state: Mutex::new(initial_state),
-            map_guard: Mutex::new(()),
         }
     }
 
@@ -102,7 +101,7 @@ impl RenderResourceDevice for DxDevice {
                 )
                 .expect("Failed to create shared heap");
 
-            self.create_shared_texture(desc, heap)
+            self.create_shared_texture(desc, heap, None)
         } else {
             self.create_local_texture(desc)
         }
@@ -231,32 +230,32 @@ pub struct DxBuffer {
     pub(super) raw: dx::Resource,
     pub(super) desc: BufferDesc,
     pub(super) state: Mutex<dx::ResourceStates>,
-
-    map_guard: Mutex<()>,
 }
 
-impl DxBuffer {
-    pub fn map<T>(&self) -> BufferMap<'_, T> {
+impl Buffer for DxBuffer {
+    fn map<T>(&self) -> &'_ [T] {
+        let size = self.desc.size / size_of::<T>();
+
+        let pointer = self.raw.map::<T>(0, None).expect("Failed to map buffer");
+
+        unsafe {
+            let pointer = std::slice::from_raw_parts(pointer.as_ptr(), size);
+
+            pointer
+        }
+    }
+
+    fn map_mut<T>(&mut self) -> &'_ mut [T] {
         let size = self.desc.size / size_of::<T>();
 
         let pointer = self.raw.map::<T>(0, None).expect("Failed to map buffer");
 
         unsafe {
             let pointer = std::slice::from_raw_parts_mut(pointer.as_ptr(), size);
-            let guard = self.map_guard.lock();
 
-            BufferMap {
-                _guard: guard,
-                pointer,
-            }
+            pointer
         }
     }
-}
-
-#[derive(Debug)]
-pub struct BufferMap<'a, T> {
-    _guard: MutexGuard<'a, ()>,
-    pub pointer: &'a mut [T],
 }
 
 #[derive(Debug)]
@@ -758,7 +757,6 @@ pub struct DxTimestampQuery {
 
 impl QueryHeap for DxTimestampQuery {
     fn read_buffer(&self) -> &[u8] {
-        let map = self.buffer.map();
-        map.pointer
+        self.buffer.map()
     }
 }

@@ -9,11 +9,16 @@ pub trait QueryHeap {
     fn read_buffer(&self) -> &[u8];
 }
 
+pub trait Buffer {
+    fn map<T>(&self) -> &'_ [T];
+    fn map_mut<T>(&mut self) -> &'_ mut [T];
+}
+
 pub trait RenderResourceDevice: Sized {
-    type Buffer: Send + Sync + Debug + 'static;
+    type Buffer: Buffer + Send + Sync + Debug + 'static;
     type Texture: Send + Sync + Debug + 'static;
     type Sampler: Send + Sync + Debug + 'static;
-    type TimestampQuery: Send + Sync + QueryHeap + Debug + 'static;
+    type TimestampQuery: QueryHeap + Send + Sync + Debug + 'static;
 
     fn create_buffer(&self, desc: BufferDesc) -> Self::Buffer;
     fn destroy_buffer(&self, buffer: Self::Buffer);

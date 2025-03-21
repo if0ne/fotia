@@ -1,0 +1,188 @@
+use std::sync::Arc;
+
+use hecs::World;
+
+use crate::{
+    collections::handle::Handle,
+    engine::{GpuTransform, GpuTransformComponent, MeshComponent, camera::Camera},
+    multi_gpu_renderer::{
+        csm::{CascadedShadowMaps, Cascades},
+        pso::PsoCollection,
+    },
+    ra::{
+        command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
+        context::{Context, RenderDevice},
+        resources::{Buffer, RenderResourceContext, Texture},
+        shader::{RasterPipeline, RenderShaderContext, ShaderArgument, ShaderArgumentDesc},
+        system::RenderSystem,
+    },
+    rhi::{
+        command::CommandType,
+        resources::{
+            BufferDesc, BufferUsages, TextureDesc, TextureUsages, TextureViewDesc, TextureViewType,
+        },
+        types::{Format, GeomTopology, IndexType, ResourceState, Viewport},
+    },
+};
+
+pub struct CascadedShadowMapsPass<D: RenderDevice> {
+    pub rs: Arc<RenderSystem>,
+    pub ctx: Arc<Context<D>>,
+
+    pub size: u32,
+
+    pub csm: CascadedShadowMaps,
+
+    pub gpu_csm_buffer: Handle<Buffer>,
+    pub argument: Handle<ShaderArgument>,
+
+    pub gpu_csm_proj_view_buffer: Handle<Buffer>,
+
+    pub dsv: Handle<Texture>,
+    pub srv: Handle<Texture>,
+
+    pub pso: Handle<RasterPipeline>,
+}
+
+impl<D: RenderDevice> CascadedShadowMapsPass<D> {
+    pub fn new(
+        rs: Arc<RenderSystem>,
+        ctx: Arc<Context<D>>,
+        size: u32,
+        lambda: f32,
+        psos: &PsoCollection<D>,
+        frames_in_flight: usize,
+    ) -> Self {
+        let dsv = rs.create_texture_handle();
+        let srv = rs.create_texture_handle();
+
+        let gpu_csm_buffer = rs.create_buffer_handle();
+        let gpu_csm_proj_view_buffer = rs.create_buffer_handle();
+
+        let argument = rs.create_shader_argument_handle();
+
+        ctx.bind_texture(
+            dsv,
+            TextureDesc::new_2d(
+                [2 * size, 2 * size],
+                Format::D32,
+                TextureUsages::DepthTarget | TextureUsages::Resource,
+            ),
+            None,
+        );
+
+        ctx.bind_texture_view(
+            srv,
+            dsv,
+            TextureViewDesc::default()
+                .with_view_type(TextureViewType::ShaderResource)
+                .with_format(Format::R32),
+        );
+
+        ctx.bind_buffer(
+            gpu_csm_buffer,
+            BufferDesc::cpu_to_gpu(
+                size_of::<Cascades>() * frames_in_flight,
+                BufferUsages::Uniform,
+            )
+            .with_name("CSM Buffer".into()),
+            None,
+        );
+
+        ctx.bind_buffer(
+            gpu_csm_proj_view_buffer,
+            BufferDesc::cpu_to_gpu(
+                size_of::<glam::Mat4>() * frames_in_flight * 4,
+                BufferUsages::Uniform,
+            )
+            .with_name("CSM Proj View Buffer".into()),
+            None,
+        );
+
+        ctx.bind_shader_argument(
+            argument,
+            ShaderArgumentDesc {
+                views: &[],
+                samplers: &[],
+                dynamic_buffer: Some(gpu_csm_buffer),
+            },
+        );
+
+        Self {
+            rs,
+            ctx,
+            size,
+            csm: CascadedShadowMaps::new(lambda),
+            gpu_csm_buffer,
+            argument,
+            gpu_csm_proj_view_buffer,
+            dsv,
+            srv,
+            pso: psos.csm_pass,
+        }
+    }
+
+    pub fn update(&mut self, camera: &Camera, light_dir: glam::Vec3, frame_index: usize) {
+        self.csm.update(camera, light_dir);
+
+        self.ctx.update_buffer(
+            self.gpu_csm_buffer,
+            frame_index,
+            &[self.csm.cascades.clone()],
+        );
+
+        self.ctx.update_buffer(
+            self.gpu_csm_buffer,
+            4 * frame_index,
+            &self.csm.cascades.cascade_proj_views,
+        );
+    }
+
+    pub fn render(&self, frame_idx: usize, world: &World) {
+        let mut cmd = self.ctx.create_encoder(CommandType::Graphics);
+        cmd.set_barriers(&[Barrier::Texture(self.dsv, ResourceState::DepthWrite)]);
+
+        {
+            let mut encoder = cmd.render("Cascaded Shadow Maps".into(), &[], Some(self.dsv));
+            encoder.clear_depth(self.dsv, 1.0);
+            encoder.set_render_pipeline(self.pso);
+            encoder.set_topology(GeomTopology::Triangles);
+
+            for i in 0..4 {
+                let row = i / 2;
+                let col = i % 2;
+                encoder.set_viewport(Viewport {
+                    x: (self.size * col) as f32,
+                    y: (self.size * row) as f32,
+                    w: self.size as f32,
+                    h: self.size as f32,
+                });
+                encoder.bind_shader_argument(
+                    0,
+                    self.argument,
+                    (size_of::<glam::Mat4>() * (frame_idx * 4 + i as usize)) as u64,
+                );
+
+                for (_, (transform, mesh)) in world
+                    .query::<(&GpuTransformComponent, &MeshComponent)>()
+                    .iter()
+                {
+                    encoder.bind_shader_argument(
+                        1,
+                        transform.argument,
+                        (size_of::<GpuTransform>() * frame_idx) as u64,
+                    );
+                    encoder.bind_vertex_buffer(mesh.pos_vb, 0);
+                    encoder.bind_index_buffer(mesh.ib, IndexType::U16);
+                    encoder.draw_indexed(
+                        mesh.index_count,
+                        mesh.start_index_location,
+                        mesh.base_vertex_location,
+                    );
+                }
+            }
+        }
+
+        self.ctx.enqueue(cmd);
+    }
+}

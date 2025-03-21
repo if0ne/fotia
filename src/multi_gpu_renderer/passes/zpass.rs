@@ -23,6 +23,7 @@ use crate::{
 pub struct ZPass<D: RenderDevice> {
     pub rs: Arc<RenderSystem>,
     pub ctx: Arc<Context<D>>,
+
     pub extent: [u32; 2],
     pub depth: Handle<Texture>,
     pub pso: Handle<RasterPipeline>,

@@ -1,3 +1,5 @@
+pub mod camera;
+
 use glam;
 use hecs::Entity;
 
