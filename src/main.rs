@@ -1,15 +1,23 @@
 use std::{cell::RefCell, sync::Arc};
 
-use multi_gpu_renderer::{pso::PsoCollection, shaders::ShaderCollection};
+use collections::handle::Handle;
+use engine::camera::Camera;
+use hecs::World;
+use multi_gpu_renderer::{
+    GpuGlobals, graphs::single_gpu::SingleGpuShadows, pso::PsoCollection, shaders::ShaderCollection,
+};
 use ra::{
-    command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
+    command::{Barrier, RenderCommandContext, RenderCommandEncoder},
     context::{ContextDual, RenderDevice},
+    resources::{Buffer, RenderResourceContext},
+    shader::{RenderShaderContext, ShaderArgument},
     swapchain::{RenderSwapchainContext, Surface, Swapchain},
     system::{RenderBackend, RenderBackendSettings, RenderSystem},
 };
 use rhi::{
     backend::{Api, DebugFlags},
     command::CommandType,
+    resources::BufferUsages,
     swapchain::{PresentMode, SwapchainDesc},
     types::ResourceState,
 };
@@ -27,6 +35,9 @@ pub mod timer;
 mod multi_gpu_renderer;
 
 fn main() {
+    unsafe {
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
     let console_log = tracing_subscriber::fmt::Layer::new()
         .with_ansi(true)
         .with_writer(std::io::stdout);
@@ -53,6 +64,47 @@ fn main() {
 
     let psos = PsoCollection::new(Arc::clone(&rs), Arc::clone(&group), &shaders);
 
+    let single_gpu = SingleGpuShadows::new(
+        Arc::clone(&rs),
+        Arc::clone(&group.primary),
+        [800, 600],
+        &psos,
+        3,
+    );
+
+    let world = World::new();
+    let globals = GpuGlobals::default();
+    let camera = Camera {
+        view: Default::default(),
+        far: 1000.0,
+        near: 0.1,
+        fov: 90.0f32.to_radians(),
+        aspect_ratio: 800.0 / 600.0,
+    };
+
+    let buffer = rs.create_buffer_handle();
+    let global_argument = rs.create_shader_argument_handle();
+
+    group.call(|ctx| {
+        ctx.bind_buffer(
+            buffer,
+            rhi::resources::BufferDesc::cpu_to_gpu(
+                size_of::<GpuGlobals>() * 3,
+                BufferUsages::Uniform,
+            ),
+            None,
+        );
+
+        ctx.bind_shader_argument(
+            global_argument,
+            ra::shader::ShaderArgumentDesc {
+                views: &[],
+                samplers: &[],
+                dynamic_buffer: Some(buffer),
+            },
+        );
+    });
+
     let event_loop = winit::event_loop::EventLoop::new().expect("failed to create event loop");
 
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
@@ -66,6 +118,16 @@ fn main() {
 
         shaders,
         psos,
+        single_gpu,
+
+        world,
+        frames_in_flight: 3,
+        frame_idx: 0,
+        camera,
+
+        globals,
+        buffer,
+        global_argument,
     };
 
     event_loop.run_app(&mut app).expect("failed to run app");
@@ -82,12 +144,24 @@ pub struct WindowContext<D: RenderDevice> {
 pub struct Application<D: RenderDevice> {
     pub timer: GameTimer,
 
+    pub world: World,
+
     pub wnd_ctx: Option<WindowContext<D>>,
     pub rs: Arc<RenderSystem>,
     pub context: Arc<ContextDual<D>>,
 
     pub shaders: ShaderCollection,
     pub psos: PsoCollection<D>,
+
+    pub single_gpu: SingleGpuShadows<D>,
+
+    pub frames_in_flight: usize,
+    pub frame_idx: usize,
+    pub camera: Camera,
+
+    pub globals: GpuGlobals,
+    pub buffer: Handle<Buffer>,
+    pub global_argument: Handle<ShaderArgument>,
 }
 
 impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> {
@@ -165,6 +239,12 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                 self.timer.tick();
                 self.calculate_frame_stats();
 
+                self.single_gpu.update(
+                    &self.camera,
+                    glam::Vec3::new(0.0, -1.0, 0.5),
+                    self.frame_idx,
+                );
+
                 let Some(wnd) = &mut self.wnd_ctx else {
                     return;
                 };
@@ -180,11 +260,16 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                         frame.texture,
                         ResourceState::RenderTarget,
                     )]);
-                    {
-                        let mut encoder = encoder.render("Clear framebuffer".into(), &[], None);
-                        encoder.clear_rt(frame.texture, [0.5, 0.32, 0.16, 1.0]);
-                    }
+                    ctx.enqueue(encoder);
 
+                    self.single_gpu.render(
+                        &self.world,
+                        self.global_argument,
+                        frame.texture,
+                        self.frame_idx,
+                    );
+
+                    let mut encoder = ctx.create_encoder(CommandType::Graphics);
                     encoder
                         .set_barriers(&[Barrier::Texture(frame.texture, ResourceState::Present)]);
 
@@ -193,6 +278,8 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                 });
 
                 wnd.swapchain.present();
+
+                self.frame_idx = (self.frame_idx + 1) % self.frames_in_flight;
             }
             winit::event::WindowEvent::CloseRequested => event_loop.exit(),
             _ => (),

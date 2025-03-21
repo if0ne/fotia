@@ -187,6 +187,7 @@ pub(super) fn map_resource_state(state: ResourceState) -> dx::ResourceStates {
         ResourceState::Present => dx::ResourceStates::Present,
         ResourceState::DepthWrite => dx::ResourceStates::DepthWrite,
         ResourceState::DepthRead => dx::ResourceStates::DepthRead,
+        ResourceState::Shader => dx::ResourceStates::PixelShaderResource,
     }
 }
 

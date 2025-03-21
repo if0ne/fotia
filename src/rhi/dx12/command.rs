@@ -18,7 +18,9 @@ use crate::rhi::{
         Barrier, CommandType, GpuEvent, IoCommandBuffer, RenderCommandBuffer, RenderCommandDevice,
         RenderCommandQueue, RenderEncoder, RenderResourceUploader, SyncPoint,
     },
-    resources::{BufferDesc, BufferUsages, MemoryLocation, QueryHeap, RenderResourceDevice},
+    resources::{
+        Buffer, BufferDesc, BufferUsages, MemoryLocation, QueryHeap, RenderResourceDevice,
+    },
     types::{GeomTopology, IndexType, Scissor, Timings, Viewport},
 };
 
@@ -572,17 +574,17 @@ pub struct DxIoCommandBuffer {
 impl IoCommandBuffer for DxIoCommandBuffer {
     type Device = DxDevice;
 
-    fn load_to_buffer(&mut self, device: &Self::Device, buffer: &DxBuffer, data: &'_ [u8]) {
+    fn load_to_buffer(&mut self, device: &Self::Device, buffer: &mut DxBuffer, data: &'_ [u8]) {
         if buffer.desc.memory_location == MemoryLocation::CpuToGpu || device.desc.is_uma {
-            let map = buffer.map();
-            map.pointer.clone_from_slice(data);
+            let map = buffer.map_mut();
+            map.clone_from_slice(data);
         } else {
-            let staging =
+            let mut staging =
                 device.create_buffer(BufferDesc::cpu_to_gpu(buffer.desc.size, BufferUsages::Copy));
 
             {
-                let map = staging.map();
-                map.pointer.clone_from_slice(data);
+                let map = staging.map_mut();
+                map.clone_from_slice(data);
             }
 
             self.buffer.list.copy_resource(&buffer.raw, &staging.raw);

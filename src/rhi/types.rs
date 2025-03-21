@@ -139,6 +139,7 @@ pub enum ResourceState {
     Present,
     DepthWrite,
     DepthRead,
+    Shader,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
