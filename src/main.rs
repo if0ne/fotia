@@ -1,6 +1,6 @@
 use std::{cell::RefCell, sync::Arc};
 
-use multi_gpu::{pso::PsoCollection, shaders::ShaderCollection};
+use multi_gpu_renderer::{pso::PsoCollection, shaders::ShaderCollection};
 use ra::{
     command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
     context::{ContextDual, RenderDevice},
@@ -19,11 +19,12 @@ use tracing_subscriber::layer::SubscriberExt;
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 pub mod collections;
+pub mod engine;
 pub mod ra;
 pub mod rhi;
 pub mod timer;
 
-mod multi_gpu;
+mod multi_gpu_renderer;
 
 fn main() {
     let console_log = tracing_subscriber::fmt::Layer::new()
