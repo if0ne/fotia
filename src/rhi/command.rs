@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use super::{
     resources::RenderResourceDevice,
-    types::{IndexType, ResourceState, Scissor, Timings, Viewport},
+    types::{GeomTopology, IndexType, ResourceState, Scissor, Timings, Viewport},
 };
 
 pub type SyncPoint = u64;
@@ -35,7 +35,7 @@ pub trait RenderCommandDevice: RenderResourceDevice {
     fn wait_idle(&self);
 }
 
-pub trait RenderCommandQueue {
+pub trait RenderCommandQueue: Send + Sync {
     type Device;
     type Event;
     type CommandBuffer;
@@ -113,12 +113,20 @@ pub trait RenderEncoder {
     type ShaderArgument;
 
     fn clear_rt(&self, texture: &Self::Texture, color: [f32; 4]);
+    fn clear_depth(&self, texture: &Self::Texture, depth: f32);
 
     fn set_viewport(&self, viewport: Viewport);
     fn set_scissor(&self, scissor: Scissor);
 
+    fn set_topology(&self, topology: GeomTopology);
+
     fn set_raster_pipeline(&self, pipeline: &Self::RasterPipeline);
-    fn bind_shader_argument(&self, argument: &Self::ShaderArgument, dynamic_offset: u64);
+    fn bind_shader_argument(
+        &self,
+        space: u32,
+        argument: &Self::ShaderArgument,
+        dynamic_offset: u64,
+    );
 
     fn bind_vertex_buffer(&self, buffer: &Self::Buffer, slot: usize);
     fn bind_index_buffer(&self, buffer: &Self::Buffer, ty: IndexType);

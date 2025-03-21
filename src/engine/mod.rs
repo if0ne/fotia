@@ -29,6 +29,13 @@ pub struct GpuTransformComponent {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
+#[repr(align(256))]
+pub struct GpuTransform {
+    pub mat: glam::Mat4,
+}
+
+#[derive(Clone, Debug)]
 pub struct MeshComponent {
     pub pos_vb: Handle<Buffer>,
     pub normal_vb: Handle<Buffer>,

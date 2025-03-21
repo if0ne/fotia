@@ -107,13 +107,16 @@ impl<D: RenderDevice> Context<D> {
 }
 
 pub struct ContextDual<D: RenderDevice> {
-    pub primary: Context<D>,
-    pub secondary: Context<D>,
+    pub primary: Arc<Context<D>>,
+    pub secondary: Arc<Context<D>>,
 }
 
 impl<D: RenderDevice> ContextDual<D> {
     pub fn new(primary: Context<D>, secondary: Context<D>) -> Self {
-        Self { primary, secondary }
+        Self {
+            primary: Arc::new(primary),
+            secondary: Arc::new(secondary),
+        }
     }
 
     pub fn call(&self, func: impl Fn(&Context<D>)) {
