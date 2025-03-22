@@ -15,7 +15,7 @@ use crate::{
     rhi::{
         command::CommandType,
         resources::{BufferDesc, BufferUsages},
-        types::{GeomTopology, ResourceState, Viewport},
+        types::{GeomTopology, ResourceState, Scissor, Viewport},
     },
 };
 
@@ -137,6 +137,13 @@ impl<D: RenderDevice> DirectionalLightPass<D> {
                 w: self.extent[0] as f32,
                 h: self.extent[1] as f32,
             });
+            encoder.set_scissor(Scissor {
+                x: 0,
+                y: 0,
+                w: self.extent[0],
+                h: self.extent[1],
+            });
+
             encoder.set_topology(GeomTopology::Triangles);
             encoder.bind_shader_argument(0, globals, size_of::<GpuGlobals>() * frame_idx);
             encoder.bind_shader_argument(1, self.argument, 0);

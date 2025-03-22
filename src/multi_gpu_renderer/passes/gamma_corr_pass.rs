@@ -14,7 +14,7 @@ use crate::{
     },
     rhi::{
         command::CommandType,
-        types::{GeomTopology, ResourceState, Viewport},
+        types::{GeomTopology, ResourceState, Scissor, Viewport},
     },
 };
 
@@ -73,6 +73,13 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
                 w: self.extent[0] as f32,
                 h: self.extent[1] as f32,
             });
+            encoder.set_scissor(Scissor {
+                x: 0,
+                y: 0,
+                w: self.extent[0],
+                h: self.extent[1],
+            });
+
             encoder.set_topology(GeomTopology::Triangles);
             encoder.bind_shader_argument(0, self.argument, 0);
 
