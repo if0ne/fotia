@@ -23,7 +23,7 @@ use crate::{
         resources::{
             BufferDesc, BufferUsages, TextureDesc, TextureUsages, TextureViewDesc, TextureViewType,
         },
-        types::{ClearColor, Format, GeomTopology, IndexType, ResourceState, Viewport},
+        types::{ClearColor, Format, GeomTopology, IndexType, ResourceState, Scissor, Viewport},
     },
 };
 
@@ -164,6 +164,12 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
             encoder.set_render_pipeline(self.pso);
             encoder.clear_depth(self.dsv, None);
             encoder.set_topology(GeomTopology::Triangles);
+            encoder.set_scissor(Scissor {
+                x: 0,
+                y: 0,
+                w: self.size,
+                h: self.size,
+            });
 
             for i in 0..4 {
                 let row = i / 2;
