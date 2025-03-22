@@ -429,7 +429,10 @@ impl RenderCommandBuffer for DxCommandBuffer {
 
         self.list.om_set_render_targets(&targets, false, depth);
 
-        DxRenderEncoder { cmd: self }
+        DxRenderEncoder {
+            cmd: self,
+            offsets: Default::default(),
+        }
     }
 
     fn resolve_timestamp_data(&mut self) -> std::ops::Range<usize> {
@@ -659,6 +662,7 @@ impl GpuEvent for DxFence {
 #[derive(Debug)]
 pub struct DxRenderEncoder<'a> {
     pub(super) cmd: &'a mut DxCommandBuffer,
+    pub(super) offsets: [usize; 4],
 }
 
 impl<'a> RenderEncoder for DxRenderEncoder<'a> {
@@ -723,11 +727,12 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
             .ia_set_primitive_topology(map_geom_topology(topology));
     }
 
-    fn set_raster_pipeline(&self, pipeline: &Self::RasterPipeline) {
+    fn set_raster_pipeline(&mut self, pipeline: &Self::RasterPipeline) {
         self.cmd.list.set_pipeline_state(&pipeline.raw);
 
         if let Some(layout) = &pipeline.layout {
             self.cmd.list.set_graphics_root_signature(Some(&layout.raw));
+            self.offsets = layout.offsets;
         }
     }
 
@@ -737,26 +742,27 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
         argument: &Self::ShaderArgument,
         dynamic_offset: usize,
     ) {
+        let base = self.offsets[space as usize] as u32;
         let mut offset = 0;
         if let Some(address) = &argument.dynamic_address {
             assert_eq!((address + dynamic_offset as u64) % 256, 0);
             self.cmd
                 .list
-                .set_graphics_root_constant_buffer_view(space, *address + dynamic_offset as u64);
+                .set_graphics_root_constant_buffer_view(base, *address + dynamic_offset as u64);
             offset += 1;
         }
 
         if let Some(d) = &argument.views {
             self.cmd
                 .list
-                .set_graphics_root_descriptor_table(space + offset, d.gpu);
+                .set_graphics_root_descriptor_table(base + offset, d.gpu);
             offset += 1;
         }
 
         if let Some(d) = &argument.samplers {
             self.cmd
                 .list
-                .set_graphics_root_descriptor_table(space + offset, d.gpu);
+                .set_graphics_root_descriptor_table(base + offset, d.gpu);
         }
     }
 

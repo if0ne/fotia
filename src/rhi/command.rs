@@ -120,10 +120,10 @@ pub trait RenderEncoder {
 
     fn set_topology(&self, topology: GeomTopology);
 
-    fn set_raster_pipeline(&self, pipeline: &Self::RasterPipeline);
+    fn set_raster_pipeline(&mut self, pipeline: &Self::RasterPipeline);
     fn bind_shader_argument(
         &self,
-        index: u32,
+        set: u32,
         argument: &Self::ShaderArgument,
         dynamic_offset: usize,
     );

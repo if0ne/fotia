@@ -147,7 +147,7 @@ impl<D: RenderDevice> DirectionalLightPass<D> {
             encoder.set_topology(GeomTopology::Triangles);
             encoder.bind_shader_argument(0, globals, size_of::<GpuGlobals>() * frame_idx);
             encoder.bind_shader_argument(1, self.argument, 0);
-            encoder.bind_shader_argument(3, csm_data, size_of::<Cascades>() * frame_idx);
+            encoder.bind_shader_argument(2, csm_data, size_of::<Cascades>() * frame_idx);
 
             encoder.draw(3, 0);
         }
