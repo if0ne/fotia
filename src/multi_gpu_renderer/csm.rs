@@ -72,7 +72,7 @@ impl CascadedShadowMaps {
 
             let frust_proj =
                 glam::Mat4::perspective_lh(camera.fov, camera.aspect_ratio, cur_near, cur_far);
-            let cam_view = camera.view;
+            let cam_view = camera.view();
 
             let frust_proj_view = (frust_proj * cam_view).inverse();
 
