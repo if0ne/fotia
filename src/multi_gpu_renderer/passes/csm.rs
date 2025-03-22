@@ -6,14 +6,16 @@ use crate::{
     collections::handle::Handle,
     engine::{GpuTransform, GpuTransformComponent, MeshComponent, camera::Camera},
     multi_gpu_renderer::{
-        csm::{CascadedShadowMaps, Cascades},
+        csm::{Cascade, CascadedShadowMaps, Cascades},
         pso::PsoCollection,
     },
     ra::{
         command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
         context::{Context, RenderDevice},
         resources::{Buffer, RenderResourceContext, Texture},
-        shader::{RasterPipeline, RenderShaderContext, ShaderArgument, ShaderArgumentDesc},
+        shader::{
+            RasterPipeline, RenderShaderContext, ShaderArgument, ShaderArgumentDesc, ShaderEntry,
+        },
         system::RenderSystem,
     },
     rhi::{
@@ -94,7 +96,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
         ctx.bind_buffer(
             gpu_csm_proj_view_buffer,
             BufferDesc::cpu_to_gpu(
-                size_of::<glam::Mat4>() * frames_in_flight * 4,
+                size_of::<Cascade>() * frames_in_flight * 4,
                 BufferUsages::Uniform,
             )
             .with_name("CSM Proj View Buffer".into()),
@@ -104,7 +106,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
         ctx.bind_shader_argument(
             argument,
             ShaderArgumentDesc {
-                views: &[],
+                views: &[ShaderEntry::Srv(srv)],
                 samplers: &[],
                 dynamic_buffer: Some(gpu_csm_buffer),
             },
@@ -143,11 +145,13 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
             &[self.csm.cascades.clone()],
         );
 
-        self.ctx.update_buffer(
-            self.gpu_csm_buffer,
-            4 * frame_index,
-            &self.csm.cascades.cascade_proj_views,
-        );
+        for i in 0..4 {
+            self.ctx.update_buffer(
+                self.gpu_csm_buffer,
+                4 * frame_index + i,
+                &[self.csm.cascades.cascade_proj_views[i]],
+            );
+        }
     }
 
     pub fn render(&self, frame_idx: usize, world: &World) {
@@ -156,8 +160,8 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
 
         {
             let mut encoder = cmd.render("Cascaded Shadow Maps".into(), &[], Some(self.dsv));
-            encoder.clear_depth(self.dsv, 1.0);
             encoder.set_render_pipeline(self.pso);
+            encoder.clear_depth(self.dsv, 1.0);
             encoder.set_topology(GeomTopology::Triangles);
 
             for i in 0..4 {
@@ -172,7 +176,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
                 encoder.bind_shader_argument(
                     0,
                     self.local_argument,
-                    (size_of::<glam::Mat4>() * (frame_idx * 4 + i as usize)) as u64,
+                    size_of::<Cascade>() * (frame_idx * 4 + i as usize),
                 );
 
                 for (_, (transform, mesh)) in world
@@ -182,7 +186,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
                     encoder.bind_shader_argument(
                         1,
                         transform.argument,
-                        (size_of::<GpuTransform>() * frame_idx) as u64,
+                        size_of::<GpuTransform>() * frame_idx,
                     );
                     encoder.bind_vertex_buffer(mesh.pos_vb, 0);
                     encoder.bind_index_buffer(mesh.ib, IndexType::U16);

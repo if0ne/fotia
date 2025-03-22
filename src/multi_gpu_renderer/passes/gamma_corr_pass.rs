@@ -4,7 +4,7 @@ use crate::{
     collections::handle::Handle,
     multi_gpu_renderer::pso::PsoCollection,
     ra::{
-        command::{RenderCommandContext, RenderCommandEncoder, RenderEncoder},
+        command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
         context::{Context, RenderDevice},
         resources::Texture,
         shader::{
@@ -14,7 +14,7 @@ use crate::{
     },
     rhi::{
         command::CommandType,
-        types::{GeomTopology, Viewport},
+        types::{GeomTopology, ResourceState, Viewport},
     },
 };
 
@@ -60,10 +60,12 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
 
     pub fn render(&self, swapchain_view: Handle<Texture>) {
         let mut cmd = self.ctx.create_encoder(CommandType::Graphics);
-        //cmd.set_barriers(&[gbuffer.accum -> PixelShaderResource]);
+        cmd.set_barriers(&[Barrier::Texture(self.accum_srv, ResourceState::Shader)]);
 
         {
             let mut encoder = cmd.render("Gamma Correction Pass".into(), &[swapchain_view], None);
+            encoder.set_render_pipeline(self.pso);
+
             encoder.clear_rt(swapchain_view, [1.0, 1.0, 1.0, 1.0]);
             encoder.set_viewport(Viewport {
                 x: 0.0,
@@ -71,9 +73,8 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
                 w: self.extent[0] as f32,
                 h: self.extent[1] as f32,
             });
-            encoder.set_render_pipeline(self.pso);
             encoder.set_topology(GeomTopology::Triangles);
-            //encoder.bind_shader_argument(0, self.argument, 0);
+            encoder.bind_shader_argument(0, self.argument, 0);
 
             encoder.draw(3, 0);
         }

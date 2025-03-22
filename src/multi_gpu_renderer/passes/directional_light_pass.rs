@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     collections::handle::Handle,
-    multi_gpu_renderer::{GpuGlobals, pso::PsoCollection},
+    multi_gpu_renderer::{GpuGlobals, csm::Cascades, pso::PsoCollection},
     ra::{
         command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
         context::{Context, RenderDevice},
@@ -128,6 +128,8 @@ impl<D: RenderDevice> DirectionalLightPass<D> {
 
         {
             let mut encoder = cmd.render("Directional Light Pass".into(), &[self.accum], None);
+            encoder.set_render_pipeline(self.pso);
+
             encoder.clear_rt(self.accum, [1.0, 1.0, 1.0, 1.0]);
             encoder.set_viewport(Viewport {
                 x: 0.0,
@@ -135,11 +137,10 @@ impl<D: RenderDevice> DirectionalLightPass<D> {
                 w: self.extent[0] as f32,
                 h: self.extent[1] as f32,
             });
-            encoder.set_render_pipeline(self.pso);
             encoder.set_topology(GeomTopology::Triangles);
-            encoder.bind_shader_argument(0, globals, (size_of::<GpuGlobals>() * frame_idx) as u64);
-            //encoder.bind_shader_argument(1, self.argument, 0);
-            encoder.bind_shader_argument(2, csm_data, 0);
+            encoder.bind_shader_argument(0, globals, size_of::<GpuGlobals>() * frame_idx);
+            encoder.bind_shader_argument(1, self.argument, 0);
+            encoder.bind_shader_argument(3, csm_data, size_of::<Cascades>() * frame_idx);
 
             encoder.draw(3, 0);
         }

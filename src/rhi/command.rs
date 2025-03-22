@@ -123,9 +123,9 @@ pub trait RenderEncoder {
     fn set_raster_pipeline(&self, pipeline: &Self::RasterPipeline);
     fn bind_shader_argument(
         &self,
-        space: u32,
+        index: u32,
         argument: &Self::ShaderArgument,
-        dynamic_offset: u64,
+        dynamic_offset: usize,
     );
 
     fn bind_vertex_buffer(&self, buffer: &Self::Buffer, slot: usize);

@@ -14,7 +14,6 @@ Texture2D diffuse_t : register(t0, space1);
 Texture2D normal_t : register(t1, space1);
 Texture2D material_t : register(t2, space1);
 
-
 cbuffer LightBuffer : register(b0, space1)
 {
     DirectionalLight dir_light;

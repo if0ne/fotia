@@ -91,7 +91,8 @@ fn main() {
             rhi::resources::BufferDesc::cpu_to_gpu(
                 size_of::<GpuGlobals>() * 3,
                 BufferUsages::Uniform,
-            ),
+            )
+            .with_name("Global data".into()),
             None,
         );
 
@@ -185,7 +186,7 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
             SwapchainDesc {
                 width: 800,
                 height: 600,
-                present_mode: PresentMode::Mailbox,
+                present_mode: PresentMode::Immediate,
                 frames: 3,
             },
             &wnd,
@@ -233,6 +234,7 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                         [size.width, size.height],
                         &self.rs.handles,
                     );
+                    self.single_gpu.resize([size.width, size.height]);
                 }
             }
             winit::event::WindowEvent::RedrawRequested => {
@@ -262,12 +264,14 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                     )]);
                     ctx.enqueue(encoder);
 
+                    let time = std::time::Instant::now();
                     self.single_gpu.render(
                         &self.world,
                         self.global_argument,
                         frame.texture,
                         self.frame_idx,
                     );
+                    info!("CPU TIME: {:?}", time.elapsed());
 
                     let mut encoder = ctx.create_encoder(CommandType::Graphics);
                     encoder

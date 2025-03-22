@@ -721,24 +721,28 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
         &self,
         space: u32,
         argument: &Self::ShaderArgument,
-        dynamic_offset: u64,
+        dynamic_offset: usize,
     ) {
+        let mut offset = 0;
+        if let Some(address) = &argument.dynamic_address {
+            assert_eq!((address + dynamic_offset as u64) % 256, 0);
+            self.cmd
+                .list
+                .set_graphics_root_constant_buffer_view(space, *address + dynamic_offset as u64);
+            offset += 1;
+        }
+
         if let Some(d) = &argument.views {
             self.cmd
                 .list
-                .set_graphics_root_descriptor_table(space, d.gpu);
+                .set_graphics_root_descriptor_table(space + offset, d.gpu);
+            offset += 1;
         }
 
         if let Some(d) = &argument.samplers {
             self.cmd
                 .list
-                .set_graphics_root_descriptor_table(space, d.gpu);
-        }
-
-        if let Some(address) = &argument.dynamic_address {
-            self.cmd
-                .list
-                .set_graphics_root_constant_buffer_view(space, *address + dynamic_offset);
+                .set_graphics_root_descriptor_table(space + offset, d.gpu);
         }
     }
 

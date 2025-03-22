@@ -5,7 +5,7 @@ use hecs::World;
 use crate::{
     collections::handle::Handle,
     engine::{GpuTransform, GpuTransformComponent, MeshComponent},
-    multi_gpu_renderer::pso::PsoCollection,
+    multi_gpu_renderer::{GpuGlobals, pso::PsoCollection},
     ra::{
         command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
         context::{Context, RenderDevice},
@@ -60,6 +60,8 @@ impl<D: RenderDevice> ZPass<D> {
 
         {
             let mut encoder = cmd.render("Z Prepass".into(), &[], Some(self.depth));
+            encoder.set_render_pipeline(self.pso);
+
             encoder.clear_depth(self.depth, 1.0);
             encoder.set_viewport(Viewport {
                 x: 0.0,
@@ -67,9 +69,8 @@ impl<D: RenderDevice> ZPass<D> {
                 w: self.extent[0] as f32,
                 h: self.extent[1] as f32,
             });
-            encoder.set_render_pipeline(self.pso);
             encoder.set_topology(GeomTopology::Triangles);
-            encoder.bind_shader_argument(0, globals, 0);
+            encoder.bind_shader_argument(0, globals, size_of::<GpuGlobals>() * frame_idx);
 
             for (_, (transform, mesh)) in world
                 .query::<(&GpuTransformComponent, &MeshComponent)>()
@@ -78,7 +79,7 @@ impl<D: RenderDevice> ZPass<D> {
                 encoder.bind_shader_argument(
                     1,
                     transform.argument,
-                    (size_of::<GpuTransform>() * frame_idx) as u64,
+                    size_of::<GpuTransform>() * frame_idx,
                 );
                 encoder.bind_vertex_buffer(mesh.pos_vb, 0);
                 encoder.bind_index_buffer(mesh.ib, IndexType::U16);
