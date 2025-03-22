@@ -10,6 +10,13 @@ pub struct Cascades {
     pub distances: [f32; 4],
 }
 
+#[repr(C)]
+#[repr(align(256))]
+#[derive(Clone, Debug)]
+pub struct Cascade {
+    proj_view: glam::Mat4,
+}
+
 #[derive(Debug)]
 pub struct CascadedShadowMaps {
     pub cascades: Cascades,

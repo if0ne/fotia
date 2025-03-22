@@ -5,7 +5,7 @@ use hecs::World;
 use crate::{
     collections::handle::Handle,
     engine::{GpuMaterialComponent, GpuTransform, GpuTransformComponent, MeshComponent},
-    multi_gpu_renderer::pso::PsoCollection,
+    multi_gpu_renderer::{GpuGlobals, pso::PsoCollection},
     ra::{
         command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
         context::{Context, RenderDevice},
@@ -165,6 +165,8 @@ impl<D: RenderDevice> GPass<D> {
                 &[self.diffuse, self.normal, self.material, self.accum],
                 Some(self.depth),
             );
+            encoder.set_render_pipeline(self.pso);
+
             encoder.clear_rt(self.diffuse, [0.0, 0.0, 0.0, 1.0]);
             encoder.clear_rt(self.normal, [0.0, 0.0, 0.0, 1.0]);
             encoder.clear_rt(self.material, [0.0, 0.0, 0.0, 1.0]);
@@ -177,9 +179,8 @@ impl<D: RenderDevice> GPass<D> {
                 h: self.extent[1] as f32,
             });
 
-            encoder.set_render_pipeline(self.pso);
             encoder.set_topology(GeomTopology::Triangles);
-            encoder.bind_shader_argument(0, globals, 0);
+            encoder.bind_shader_argument(0, globals, size_of::<GpuGlobals>() * frame_idx);
 
             for (_, (transform, mesh, material)) in world
                 .query::<(
@@ -194,7 +195,7 @@ impl<D: RenderDevice> GPass<D> {
                 encoder.bind_shader_argument(
                     2,
                     transform.argument,
-                    (size_of::<GpuTransform>() * frame_idx) as u64,
+                    size_of::<GpuTransform>() * frame_idx,
                 );
                 encoder.bind_vertex_buffer(mesh.pos_vb, 0);
                 encoder.bind_index_buffer(mesh.ib, IndexType::U16);

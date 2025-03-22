@@ -65,38 +65,42 @@ impl RenderShaderDevice for DxDevice {
             }
 
             if set.use_dynamic_buffer {
-                dynamic_buffers.push((i, cbvs)); // set and index
+                dynamic_buffers.push(Some((i, cbvs))); // set and index
+            } else {
+                dynamic_buffers.push(None);
             }
 
             ranges_count.push(cbvs + uavs + srvs);
             samplers_count.push(samplers);
         }
 
-        let mut tables = vec![];
+        let mut parameters = SmallVec::<[_; 16]>::new();
         let mut range_offest = 0;
         let mut sampler_offest = 0;
 
-        for (range_count, sampler_count) in ranges_count.iter().zip(samplers_count.iter()) {
+        for ((range_count, sampler_count), db) in ranges_count
+            .iter()
+            .zip(samplers_count.iter())
+            .zip(dynamic_buffers.into_iter())
+        {
             let ranges = &ranges[range_offest..(range_offest + *range_count as usize)];
             let samplers =
                 &sampler_ranges[sampler_offest..(sampler_offest + *sampler_count as usize)];
 
+            if let Some((set, idx)) = db {
+                parameters.push(dx::RootParameter::cbv(idx as u32, set as u32));
+            }
+
             if ranges.len() > 0 {
-                tables.push(dx::RootParameter::descriptor_table(ranges));
+                parameters.push(dx::RootParameter::descriptor_table(ranges));
                 range_offest += *range_count as usize;
             }
 
             if samplers.len() > 0 {
-                tables.push(dx::RootParameter::descriptor_table(samplers));
+                parameters.push(dx::RootParameter::descriptor_table(samplers));
                 sampler_offest += *sampler_count as usize;
             }
         }
-
-        let parameters = dynamic_buffers
-            .into_iter()
-            .map(|(set, idx)| dx::RootParameter::cbv(idx as u32, set as u32))
-            .chain(tables.into_iter())
-            .collect::<SmallVec<[_; 8]>>();
 
         let samplers = desc
             .static_samplers
