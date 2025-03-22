@@ -74,14 +74,16 @@ impl RenderShaderDevice for DxDevice {
             samplers_count.push(samplers);
         }
 
+        let mut offsets = [0; 4];
         let mut parameters = SmallVec::<[_; 16]>::new();
         let mut range_offest = 0;
         let mut sampler_offest = 0;
 
-        for ((range_count, sampler_count), db) in ranges_count
+        for (i, ((range_count, sampler_count), db)) in ranges_count
             .iter()
             .zip(samplers_count.iter())
             .zip(dynamic_buffers.into_iter())
+            .enumerate()
         {
             let ranges = &ranges[range_offest..(range_offest + *range_count as usize)];
             let samplers =
@@ -89,17 +91,25 @@ impl RenderShaderDevice for DxDevice {
 
             if let Some((set, idx)) = db {
                 parameters.push(dx::RootParameter::cbv(idx as u32, set as u32));
+                offsets[i] += 1;
             }
 
             if ranges.len() > 0 {
                 parameters.push(dx::RootParameter::descriptor_table(ranges));
                 range_offest += *range_count as usize;
+                offsets[i] += 1;
             }
 
             if samplers.len() > 0 {
                 parameters.push(dx::RootParameter::descriptor_table(samplers));
                 sampler_offest += *sampler_count as usize;
+                offsets[i] += 1;
             }
+        }
+
+        offsets.rotate_right(1);
+        for i in 1..4 {
+            offsets[i] += offsets[i - 1];
         }
 
         let samplers = desc
@@ -118,7 +128,7 @@ impl RenderShaderDevice for DxDevice {
             .serialize_and_create_root_signature(&desc, dx::RootSignatureVersion::V1_0, 0)
             .expect("failed to create pipeline layout");
 
-        DxPipelineLayout { raw }
+        DxPipelineLayout { raw, offsets }
     }
 
     fn destroy_pipeline_layout(&self, _layout: Self::PipelineLayout) {}
@@ -296,6 +306,7 @@ impl RenderShaderDevice for DxDevice {
 #[derive(Clone, Debug)]
 pub struct DxPipelineLayout {
     pub(super) raw: dx::RootSignature,
+    pub(super) offsets: [usize; 4],
 }
 
 #[derive(Debug)]

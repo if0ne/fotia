@@ -312,15 +312,14 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
 
     fn bind_shader_argument(
         &mut self,
-        index: u32,
+        set: u32,
         argument: Handle<ShaderArgument>,
         dynamic_offset: usize,
     ) {
         let guard = self.mapper.shader_arguments.lock();
         let argument = guard.get(argument).expect("failed to get shader argument");
 
-        self.raw
-            .bind_shader_argument(index, argument, dynamic_offset);
+        self.raw.bind_shader_argument(set, argument, dynamic_offset);
     }
 
     fn bind_vertex_buffer(&mut self, buffer: Handle<Buffer>, slot: usize) {
