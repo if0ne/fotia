@@ -23,7 +23,7 @@ use crate::{
         resources::{
             BufferDesc, BufferUsages, TextureDesc, TextureUsages, TextureViewDesc, TextureViewType,
         },
-        types::{Format, GeomTopology, IndexType, ResourceState, Viewport},
+        types::{ClearColor, Format, GeomTopology, IndexType, ResourceState, Viewport},
     },
 };
 
@@ -71,7 +71,8 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
                 [2 * size, 2 * size],
                 Format::D32,
                 TextureUsages::DepthTarget | TextureUsages::Resource,
-            ),
+            )
+            .with_color(ClearColor::Depth(1.0)),
             None,
         );
 
@@ -161,7 +162,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
         {
             let mut encoder = cmd.render("Cascaded Shadow Maps".into(), &[], Some(self.dsv));
             encoder.set_render_pipeline(self.pso);
-            encoder.clear_depth(self.dsv, 1.0);
+            encoder.clear_depth(self.dsv, None);
             encoder.set_topology(GeomTopology::Triangles);
 
             for i in 0..4 {

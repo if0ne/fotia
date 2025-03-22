@@ -5,7 +5,7 @@ use crate::rhi::{
     resources::{TextureDesc, TextureType, TextureUsages},
     shader::{SamplerType, StaticSampler},
     types::{
-        AddressMode, ComparisonFunc, CullMode, DepthOp, Filter, Format, GeomTopology,
+        AddressMode, ClearColor, ComparisonFunc, CullMode, DepthOp, Filter, Format, GeomTopology,
         ResourceState, VertexAttribute, VertexType,
     },
 };
@@ -195,5 +195,12 @@ pub(super) fn map_geom_topology(topo: GeomTopology) -> dx::PrimitiveTopology {
     match topo {
         GeomTopology::Triangles => dx::PrimitiveTopology::Triangle,
         GeomTopology::Lines => dx::PrimitiveTopology::Line,
+    }
+}
+
+pub(super) fn map_clear_color(format: Format, color: ClearColor) -> dx::ClearValue {
+    match color {
+        ClearColor::Color(c) => dx::ClearValue::color(map_format(format), c),
+        ClearColor::Depth(c) => dx::ClearValue::depth(map_format(format), c, 0),
     }
 }

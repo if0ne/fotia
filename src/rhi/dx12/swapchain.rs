@@ -112,6 +112,7 @@ impl RenderSwapchainDevice for DxDevice {
                     format: Format::Rgba8Unorm,
                     usage: TextureUsages::RenderTarget,
                     extent: [extent[0], extent[1], 1],
+                    clear_color: None,
                 },
                 size: 0, // TODO: Calculate
                 descriptor,

@@ -2,7 +2,7 @@ use std::{borrow::Cow, fmt::Debug, ops::Range};
 
 use super::{
     command::CommandType,
-    types::{AddressMode, Filter, Format},
+    types::{AddressMode, ClearColor, Filter, Format},
 };
 
 pub trait QueryHeap {
@@ -112,7 +112,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TextureDesc {
     pub name: Option<Cow<'static, str>>,
     pub ty: TextureType,
@@ -120,6 +120,7 @@ pub struct TextureDesc {
     pub mip_levels: u16,
     pub format: Format,
     pub usage: TextureUsages,
+    pub clear_color: Option<ClearColor>,
 }
 
 impl TextureDesc {
@@ -131,6 +132,7 @@ impl TextureDesc {
             mip_levels: 1,
             format,
             usage,
+            clear_color: None,
         }
     }
 
@@ -142,6 +144,7 @@ impl TextureDesc {
             mip_levels: 1,
             format,
             usage,
+            clear_color: None,
         }
     }
 
@@ -153,6 +156,7 @@ impl TextureDesc {
             mip_levels: 1,
             format,
             usage,
+            clear_color: None,
         }
     }
 
@@ -164,6 +168,7 @@ impl TextureDesc {
             mip_levels: 1,
             format,
             usage,
+            clear_color: None,
         }
     }
 
@@ -175,6 +180,7 @@ impl TextureDesc {
             mip_levels: 1,
             format,
             usage,
+            clear_color: None,
         }
     }
 
@@ -185,6 +191,11 @@ impl TextureDesc {
 
     pub fn with_mip_levels(mut self, mip_levels: u16) -> Self {
         self.mip_levels = mip_levels;
+        self
+    }
+
+    pub fn with_color(mut self, color: ClearColor) -> Self {
+        self.clear_color = Some(color);
         self
     }
 

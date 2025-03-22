@@ -112,8 +112,8 @@ pub trait RenderEncoder {
     type RasterPipeline;
     type ShaderArgument;
 
-    fn clear_rt(&self, texture: &Self::Texture, color: [f32; 4]);
-    fn clear_depth(&self, texture: &Self::Texture, depth: f32);
+    fn clear_rt(&self, texture: &Self::Texture, color: Option<[f32; 4]>);
+    fn clear_depth(&self, texture: &Self::Texture, depth: Option<f32>);
 
     fn set_viewport(&self, viewport: Viewport);
     fn set_scissor(&self, scissor: Scissor);

@@ -66,7 +66,7 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
             let mut encoder = cmd.render("Gamma Correction Pass".into(), &[swapchain_view], None);
             encoder.set_render_pipeline(self.pso);
 
-            encoder.clear_rt(swapchain_view, [1.0, 1.0, 1.0, 1.0]);
+            encoder.clear_rt(swapchain_view, Some([1.0, 1.0, 1.0, 1.0]));
             encoder.set_viewport(Viewport {
                 x: 0.0,
                 y: 0.0,
