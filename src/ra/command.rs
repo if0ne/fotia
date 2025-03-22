@@ -256,8 +256,8 @@ pub struct RenderEncoderImpl<'a, D: RenderDevice> {
 }
 
 pub trait RenderEncoder {
-    fn clear_rt(&mut self, texture: Handle<Texture>, color: [f32; 4]);
-    fn clear_depth(&mut self, texture: Handle<Texture>, depth: f32);
+    fn clear_rt(&mut self, texture: Handle<Texture>, color: Option<[f32; 4]>);
+    fn clear_depth(&mut self, texture: Handle<Texture>, depth: Option<f32>);
 
     fn set_viewport(&mut self, viewport: Viewport);
     fn set_scissor(&mut self, scissor: Scissor);
@@ -279,13 +279,13 @@ pub trait RenderEncoder {
 }
 
 impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
-    fn clear_rt(&mut self, texture: Handle<Texture>, color: [f32; 4]) {
+    fn clear_rt(&mut self, texture: Handle<Texture>, color: Option<[f32; 4]>) {
         let guard = self.mapper.textures.lock();
         self.raw
             .clear_rt(guard.get(texture).expect("failed to get texture"), color);
     }
 
-    fn clear_depth(&mut self, texture: Handle<Texture>, depth: f32) {
+    fn clear_depth(&mut self, texture: Handle<Texture>, depth: Option<f32>) {
         let guard = self.mapper.textures.lock();
         self.raw
             .clear_depth(guard.get(texture).expect("failed to get texture"), depth);

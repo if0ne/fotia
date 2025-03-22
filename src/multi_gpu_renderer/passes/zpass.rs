@@ -16,7 +16,7 @@ use crate::{
     rhi::{
         command::CommandType,
         resources::{TextureDesc, TextureUsages},
-        types::{Format, GeomTopology, IndexType, ResourceState, Viewport},
+        types::{ClearColor, Format, GeomTopology, IndexType, ResourceState, Viewport},
     },
 };
 
@@ -41,7 +41,8 @@ impl<D: RenderDevice> ZPass<D> {
         ctx.bind_texture(
             depth,
             TextureDesc::new_2d(extent, Format::D24S8, TextureUsages::DepthTarget)
-                .with_name("Prepass Depth".into()),
+                .with_name("Prepass Depth".into())
+                .with_color(ClearColor::Depth(1.0)),
             None,
         );
 
@@ -62,7 +63,7 @@ impl<D: RenderDevice> ZPass<D> {
             let mut encoder = cmd.render("Z Prepass".into(), &[], Some(self.depth));
             encoder.set_render_pipeline(self.pso);
 
-            encoder.clear_depth(self.depth, 1.0);
+            encoder.clear_depth(self.depth, None);
             encoder.set_viewport(Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -98,7 +99,8 @@ impl<D: RenderDevice> ZPass<D> {
         self.ctx.bind_texture(
             self.depth,
             TextureDesc::new_2d(extent, Format::D24S8, TextureUsages::DepthTarget)
-                .with_name("Prepass Depth".into()),
+                .with_name("Prepass Depth".into())
+                .with_color(ClearColor::Depth(1.0)),
             None,
         );
 

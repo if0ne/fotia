@@ -130,7 +130,7 @@ impl<D: RenderDevice> DirectionalLightPass<D> {
             let mut encoder = cmd.render("Directional Light Pass".into(), &[self.accum], None);
             encoder.set_render_pipeline(self.pso);
 
-            encoder.clear_rt(self.accum, [1.0, 1.0, 1.0, 1.0]);
+            encoder.clear_rt(self.accum, None);
             encoder.set_viewport(Viewport {
                 x: 0.0,
                 y: 0.0,

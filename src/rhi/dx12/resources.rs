@@ -13,7 +13,7 @@ use crate::rhi::{
 };
 
 use super::{
-    conv::{map_address_mode, map_filter, map_format},
+    conv::{map_address_mode, map_clear_color, map_filter, map_format},
     device::{Descriptor, DxDevice},
 };
 
@@ -306,6 +306,8 @@ impl DxDevice {
             dx::ResourceStates::Common
         };
 
+        let clear_color = desc.clear_color.map(|c| map_clear_color(desc.format, c));
+
         let raw = self
             .gpu
             .create_committed_resource(
@@ -313,7 +315,7 @@ impl DxDevice {
                 dx::HeapFlags::empty(),
                 &raw_desc,
                 state,
-                None,
+                clear_color.as_ref(),
             )
             .expect("Failed to create buffer");
 
@@ -368,9 +370,16 @@ impl DxDevice {
                 .gpu
                 .get_copyable_footprints(&raw_desc, 0..1, 0, None, None, None);
 
+            let clear_color = desc.clear_color.map(|c| map_clear_color(desc.format, c));
             let cross_res = self
                 .gpu
-                .create_placed_resource(&heap, 0, &raw_desc, dx::ResourceStates::Common, None)
+                .create_placed_resource(
+                    &heap,
+                    0,
+                    &raw_desc,
+                    dx::ResourceStates::Common,
+                    clear_color.as_ref(),
+                )
                 .expect("failed to create cross texture");
 
             let view = overrided_view.unwrap_or_else(|| desc.to_default_view());
@@ -406,6 +415,7 @@ impl DxDevice {
                 _is_view: false,
             }
         } else {
+            let clear_color = desc.clear_color.map(|c| map_clear_color(desc.format, c));
             let raw = self
                 .gpu
                 .create_committed_resource(
@@ -413,7 +423,7 @@ impl DxDevice {
                     dx::HeapFlags::empty(),
                     &raw_desc,
                     dx::ResourceStates::Common,
-                    None,
+                    clear_color.as_ref(),
                 )
                 .expect("Failed to create buffer");
 

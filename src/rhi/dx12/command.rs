@@ -21,7 +21,7 @@ use crate::rhi::{
     resources::{
         Buffer, BufferDesc, BufferUsages, MemoryLocation, QueryHeap, RenderResourceDevice,
     },
-    types::{GeomTopology, IndexType, Scissor, Timings, Viewport},
+    types::{ClearColor, GeomTopology, IndexType, Scissor, Timings, Viewport},
 };
 
 use super::{
@@ -667,16 +667,30 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
     type RasterPipeline = DxRasterPipeline;
     type ShaderArgument = DxShaderArgument;
 
-    fn clear_rt(&self, texture: &Self::Texture, color: [f32; 4]) {
+    fn clear_rt(&self, texture: &Self::Texture, color: Option<[f32; 4]>) {
         if let Some(descriptor) = &texture.descriptor {
+            let color = match (texture.desc.clear_color, color) {
+                (Some(ClearColor::Color(c)), None) => c,
+                (Some(ClearColor::Color(_)), Some(c)) => c,
+                (None, Some(c)) => c,
+                (_, _) => Default::default(),
+            };
+
             self.cmd
                 .list
                 .clear_render_target_view(descriptor.cpu, color, &[]);
         }
     }
 
-    fn clear_depth(&self, texture: &Self::Texture, depth: f32) {
+    fn clear_depth(&self, texture: &Self::Texture, depth: Option<f32>) {
         if let Some(descriptor) = &texture.descriptor {
+            let depth = match (texture.desc.clear_color, depth) {
+                (Some(ClearColor::Depth(c)), None) => c,
+                (Some(ClearColor::Depth(_)), Some(c)) => c,
+                (None, Some(c)) => c,
+                (_, _) => Default::default(),
+            };
+
             self.cmd.list.clear_depth_stencil_view(
                 descriptor.cpu,
                 dx::ClearFlags::Depth,

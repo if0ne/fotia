@@ -16,7 +16,7 @@ use crate::{
     rhi::{
         command::CommandType,
         resources::{TextureDesc, TextureUsages, TextureViewDesc, TextureViewType},
-        types::{Format, GeomTopology, IndexType, ResourceState, Viewport},
+        types::{ClearColor, Format, GeomTopology, IndexType, ResourceState, Viewport},
     },
 };
 
@@ -61,7 +61,8 @@ impl<D: RenderDevice> GPass<D> {
                 Format::Rgba32,
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
-            .with_name("Diffuse Texture".into()),
+            .with_name("Diffuse Texture".into())
+            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
             None,
         );
 
@@ -81,7 +82,8 @@ impl<D: RenderDevice> GPass<D> {
                 Format::Rgba32,
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
-            .with_name("Normal Texture".into()),
+            .with_name("Normal Texture".into())
+            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
             None,
         );
 
@@ -101,7 +103,8 @@ impl<D: RenderDevice> GPass<D> {
                 Format::Rgba32,
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
-            .with_name("Material Texture".into()),
+            .with_name("Material Texture".into())
+            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
             None,
         );
 
@@ -121,7 +124,8 @@ impl<D: RenderDevice> GPass<D> {
                 Format::Rgba32,
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
-            .with_name("Accumulation Texture".into()),
+            .with_name("Accumulation Texture".into())
+            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
             None,
         );
 
@@ -167,10 +171,10 @@ impl<D: RenderDevice> GPass<D> {
             );
             encoder.set_render_pipeline(self.pso);
 
-            encoder.clear_rt(self.diffuse, [0.0, 0.0, 0.0, 1.0]);
-            encoder.clear_rt(self.normal, [0.0, 0.0, 0.0, 1.0]);
-            encoder.clear_rt(self.material, [0.0, 0.0, 0.0, 1.0]);
-            encoder.clear_rt(self.accum, [0.0, 0.0, 0.0, 1.0]);
+            encoder.clear_rt(self.diffuse, None);
+            encoder.clear_rt(self.normal, None);
+            encoder.clear_rt(self.material, None);
+            encoder.clear_rt(self.accum, None);
 
             encoder.set_viewport(Viewport {
                 x: 0.0,
@@ -218,7 +222,8 @@ impl<D: RenderDevice> GPass<D> {
                 Format::Rgba32,
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
-            .with_name("Diffuse Texture".into()),
+            .with_name("Diffuse Texture".into())
+            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
             None,
         );
 
@@ -235,7 +240,8 @@ impl<D: RenderDevice> GPass<D> {
                 Format::Rgba32,
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
-            .with_name("Normal Texture".into()),
+            .with_name("Normal Texture".into())
+            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
             None,
         );
 
@@ -252,7 +258,8 @@ impl<D: RenderDevice> GPass<D> {
                 Format::Rgba32,
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
-            .with_name("Material Texture".into()),
+            .with_name("Material Texture".into())
+            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
             None,
         );
 
@@ -260,6 +267,18 @@ impl<D: RenderDevice> GPass<D> {
             self.material_srv,
             self.material,
             TextureViewDesc::default().with_view_type(TextureViewType::ShaderResource),
+        );
+
+        self.ctx.bind_texture(
+            self.accum,
+            TextureDesc::new_2d(
+                extent,
+                Format::Rgba32,
+                TextureUsages::RenderTarget | TextureUsages::Resource,
+            )
+            .with_name("Accum Texture".into())
+            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
+            None,
         );
 
         self.ctx.bind_texture_view(

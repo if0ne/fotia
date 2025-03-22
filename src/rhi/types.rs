@@ -153,3 +153,9 @@ pub struct Timings {
     pub timings: Vec<(Cow<'static, str>, Duration)>,
     pub total: Duration,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ClearColor {
+    Color([f32; 4]),
+    Depth(f32),
+}
