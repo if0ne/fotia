@@ -1,3 +1,4 @@
+use glam::vec3;
 use hecs::World;
 
 use crate::{
@@ -100,7 +101,7 @@ pub fn create_multi_gpu_scene<D: RenderDevice>(
         for (buffer, argument) in prepared.submeshes.iter() {
             let data = (0..frames_in_flight)
                 .map(|_| GpuTransform {
-                    mat: glam::Mat4::IDENTITY,
+                    mat: glam::Mat4::from_scale(vec3(5.0, 5.0, 5.0)),
                 })
                 .collect::<Vec<_>>();
 

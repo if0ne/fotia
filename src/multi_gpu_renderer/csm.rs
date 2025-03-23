@@ -14,7 +14,7 @@ pub struct Cascades {
 #[repr(align(256))]
 #[derive(Clone, Debug)]
 pub struct Cascade {
-    proj_view: glam::Mat4,
+    pub proj_view: glam::Mat4,
 }
 
 #[derive(Debug)]
