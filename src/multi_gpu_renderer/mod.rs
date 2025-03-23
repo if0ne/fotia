@@ -234,18 +234,20 @@ pub fn create_multi_gpu_scene<D: RenderDevice>(
                 *argument,
                 ShaderArgumentDesc {
                     views: &[
-                        ShaderEntry::Srv(
-                            material
-                                .diffuse_map
-                                .map(|idx| prepared.images[idx])
-                                .unwrap_or(dummy.diffuse),
-                        ),
-                        ShaderEntry::Srv(
-                            material
-                                .normal_map
-                                .map(|idx| prepared.images[idx])
-                                .unwrap_or(dummy.normal),
-                        ),
+                        // ShaderEntry::Srv(
+                        //     material
+                        //         .diffuse_map
+                        //         .map(|idx| prepared.images[idx])
+                        //         .unwrap_or(dummy.diffuse),
+                        // ),
+                        // ShaderEntry::Srv(
+                        //     material
+                        //         .normal_map
+                        //         .map(|idx| prepared.images[idx])
+                        //         .unwrap_or(dummy.normal),
+                        // ),
+                        ShaderEntry::Srv(dummy.diffuse),
+                        ShaderEntry::Srv(dummy.normal),
                     ],
                     samplers: &[],
                     dynamic_buffer: Some(*buffer),
