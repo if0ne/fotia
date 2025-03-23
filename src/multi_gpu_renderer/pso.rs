@@ -145,11 +145,7 @@ impl<D: RenderDevice> PsoCollection<D> {
                             use_dynamic_buffer: true,
                         },
                         BindingSet {
-                            entries: &[
-                                BindingEntry::new(BindingType::Srv, 1),
-                                BindingEntry::new(BindingType::Srv, 1),
-                                BindingEntry::new(BindingType::Srv, 1),
-                            ],
+                            entries: &[BindingEntry::new(BindingType::Srv, 3)],
                             use_dynamic_buffer: true,
                         },
                         BindingSet {
@@ -247,10 +243,7 @@ impl<D: RenderDevice> PsoCollection<D> {
                             use_dynamic_buffer: true,
                         },
                         BindingSet {
-                            entries: &[
-                                BindingEntry::new(BindingType::Srv, 1),
-                                BindingEntry::new(BindingType::Srv, 1),
-                            ],
+                            entries: &[BindingEntry::new(BindingType::Srv, 2)],
                             use_dynamic_buffer: true,
                         },
                         BindingSet {
