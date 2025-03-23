@@ -1,21 +1,12 @@
 pub mod camera;
+pub mod gltf;
 
 use glam;
-use hecs::Entity;
 
 use crate::{
     collections::handle::Handle,
-    ra::{
-        resources::{Buffer, Texture},
-        shader::ShaderArgument,
-    },
+    ra::{resources::Buffer, shader::ShaderArgument},
 };
-
-#[derive(Clone, Debug)]
-pub struct ParentComponent {
-    entity: Entity,
-    from_child: TransformComponent,
-}
 
 #[derive(Clone, Debug)]
 pub struct TransformComponent {
@@ -38,7 +29,7 @@ pub struct GpuTransform {
 }
 
 #[derive(Clone, Debug)]
-pub struct MeshComponent {
+pub struct GpuMeshComponent {
     pub pos_vb: Handle<Buffer>,
     pub normal_vb: Handle<Buffer>,
     pub uv_vb: Handle<Buffer>,
@@ -52,13 +43,12 @@ pub struct MeshComponent {
 }
 
 #[derive(Clone, Debug)]
-pub struct MaterialComponent {
+#[repr(C)]
+#[repr(align(256))]
+pub struct GpuMaterial {
     pub diffuse_color: [f32; 4],
     pub fresnel_r0: f32,
     pub roughness: f32,
-
-    pub diffuse_map: Handle<Texture>,
-    pub normal_map: Handle<Texture>,
 }
 
 #[derive(Clone, Debug)]

@@ -4,7 +4,7 @@ use hecs::World;
 
 use crate::{
     collections::handle::Handle,
-    engine::{GpuTransform, GpuTransformComponent, MeshComponent},
+    engine::{GpuMeshComponent, GpuTransform, GpuTransformComponent},
     multi_gpu_renderer::{GpuGlobals, pso::PsoCollection},
     ra::{
         command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
@@ -80,7 +80,7 @@ impl<D: RenderDevice> ZPass<D> {
             encoder.bind_shader_argument(0, globals, size_of::<GpuGlobals>() * frame_idx);
 
             for (_, (transform, mesh)) in world
-                .query::<(&GpuTransformComponent, &MeshComponent)>()
+                .query::<(&GpuTransformComponent, &GpuMeshComponent)>()
                 .iter()
             {
                 encoder.bind_shader_argument(

@@ -4,7 +4,7 @@ use hecs::World;
 
 use crate::{
     collections::handle::Handle,
-    engine::{GpuMaterialComponent, GpuTransform, GpuTransformComponent, MeshComponent},
+    engine::{GpuMaterialComponent, GpuMeshComponent, GpuTransform, GpuTransformComponent},
     multi_gpu_renderer::{GpuGlobals, pso::PsoCollection},
     ra::{
         command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
@@ -62,7 +62,7 @@ impl<D: RenderDevice> GPass<D> {
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
             .with_name("Diffuse Texture".into())
-            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
+            .with_color(ClearColor::Color([1.0, 1.0, 1.0, 1.0])),
             None,
         );
 
@@ -83,7 +83,7 @@ impl<D: RenderDevice> GPass<D> {
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
             .with_name("Normal Texture".into())
-            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
+            .with_color(ClearColor::Color([1.0, 1.0, 1.0, 1.0])),
             None,
         );
 
@@ -104,7 +104,7 @@ impl<D: RenderDevice> GPass<D> {
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
             .with_name("Material Texture".into())
-            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
+            .with_color(ClearColor::Color([1.0, 1.0, 1.0, 1.0])),
             None,
         );
 
@@ -125,7 +125,7 @@ impl<D: RenderDevice> GPass<D> {
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
             .with_name("Accumulation Texture".into())
-            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
+            .with_color(ClearColor::Color([1.0, 1.0, 1.0, 1.0])),
             None,
         );
 
@@ -195,7 +195,7 @@ impl<D: RenderDevice> GPass<D> {
             for (_, (transform, mesh, material)) in world
                 .query::<(
                     &GpuTransformComponent,
-                    &MeshComponent,
+                    &GpuMeshComponent,
                     &GpuMaterialComponent,
                 )>()
                 .iter()
@@ -208,7 +208,10 @@ impl<D: RenderDevice> GPass<D> {
                     size_of::<GpuTransform>() * frame_idx,
                 );
                 encoder.bind_vertex_buffer(mesh.pos_vb, 0);
-                encoder.bind_index_buffer(mesh.ib, IndexType::U16);
+                encoder.bind_vertex_buffer(mesh.normal_vb, 1);
+                encoder.bind_vertex_buffer(mesh.uv_vb, 2);
+                encoder.bind_vertex_buffer(mesh.tangent_vb, 3);
+                encoder.bind_index_buffer(mesh.ib, IndexType::U32);
                 encoder.draw_indexed(
                     mesh.index_count,
                     mesh.start_index_location,
