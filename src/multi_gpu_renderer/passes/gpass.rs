@@ -166,7 +166,7 @@ impl<D: RenderDevice> GPass<D> {
         {
             let mut encoder = cmd.render(
                 "GPass".into(),
-                &[self.diffuse, self.normal, self.material, self.accum],
+                &[self.diffuse, self.normal, self.material],
                 Some(self.depth),
             );
             encoder.set_render_pipeline(self.pso);

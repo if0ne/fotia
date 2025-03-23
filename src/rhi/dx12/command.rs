@@ -21,7 +21,7 @@ use crate::rhi::{
     resources::{
         Buffer, BufferDesc, BufferUsages, MemoryLocation, QueryHeap, RenderResourceDevice,
     },
-    types::{ClearColor, GeomTopology, IndexType, Scissor, Timings, Viewport},
+    types::{ClearColor, GeomTopology, IndexType, ResourceState, Scissor, Timings, Viewport},
 };
 
 use super::{
@@ -369,7 +369,7 @@ impl RenderCommandBuffer for DxCommandBuffer {
         timings
     }
 
-    fn set_barriers<'a>(&self, barriers: impl IntoIterator<Item = Barrier<'a, Self::Device>>) {
+    fn set_barriers<'a>(&self, barriers: impl IntoIterator<Item = Barrier<'a, DxDevice>>) {
         let barriers = barriers
             .into_iter()
             .filter_map(|b| match b {

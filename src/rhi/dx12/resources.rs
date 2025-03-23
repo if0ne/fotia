@@ -302,6 +302,8 @@ impl DxDevice {
             dx::ResourceStates::RenderTarget
         } else if desc.usage.contains(TextureUsages::DepthTarget) {
             dx::ResourceStates::DepthWrite
+        } else if desc.usage.contains(TextureUsages::Resource) {
+            dx::ResourceStates::PixelShaderResource
         } else {
             dx::ResourceStates::Common
         };

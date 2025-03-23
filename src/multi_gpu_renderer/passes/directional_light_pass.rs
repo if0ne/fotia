@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use glam::{vec3, vec4};
+
 use crate::{
     collections::handle::Handle,
     multi_gpu_renderer::{GpuGlobals, csm::Cascades, pso::PsoCollection},
@@ -81,6 +83,43 @@ impl<D: RenderDevice> DirectionalLightPass<D> {
             )
             .with_name("Light Date Buffer".into()),
             None,
+        );
+
+        ctx.update_buffer(
+            light_data,
+            0,
+            &[
+                LightData {
+                    dir_light: GpuDirectionalLight {
+                        strength: vec3(1.0, 0.81, 0.16),
+                        _pad: 0.0,
+                        direction: vec3(-1.0, -1.0, -1.0),
+                    },
+                    ambient_light: GpuAmbientLight {
+                        color: vec4(0.3, 0.3, 0.63, 1.0),
+                    },
+                },
+                LightData {
+                    dir_light: GpuDirectionalLight {
+                        strength: vec3(1.0, 0.81, 0.16),
+                        _pad: 0.0,
+                        direction: vec3(-1.0, -1.0, -1.0),
+                    },
+                    ambient_light: GpuAmbientLight {
+                        color: vec4(0.3, 0.3, 0.63, 1.0),
+                    },
+                },
+                LightData {
+                    dir_light: GpuDirectionalLight {
+                        strength: vec3(1.0, 0.81, 0.16),
+                        _pad: 0.0,
+                        direction: vec3(-1.0, -1.0, -1.0),
+                    },
+                    ambient_light: GpuAmbientLight {
+                        color: vec4(0.3, 0.3, 0.63, 1.0),
+                    },
+                },
+            ],
         );
 
         ctx.bind_shader_argument(

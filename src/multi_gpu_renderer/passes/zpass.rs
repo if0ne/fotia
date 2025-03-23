@@ -5,7 +5,7 @@ use hecs::World;
 use crate::{
     collections::handle::Handle,
     engine::{GpuMeshComponent, GpuTransform, GpuTransformComponent},
-    multi_gpu_renderer::{GpuGlobals, pso::PsoCollection},
+    multi_gpu_renderer::{pso::PsoCollection, GpuGlobals},
     ra::{
         command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
         context::{Context, RenderDevice},
@@ -89,7 +89,7 @@ impl<D: RenderDevice> ZPass<D> {
                     size_of::<GpuTransform>() * frame_idx,
                 );
                 encoder.bind_vertex_buffer(mesh.pos_vb, 0);
-                encoder.bind_index_buffer(mesh.ib, IndexType::U16);
+                encoder.bind_index_buffer(mesh.ib, IndexType::U32);
                 encoder.draw_indexed(
                     mesh.index_count,
                     mesh.start_index_location,
