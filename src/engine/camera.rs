@@ -1,31 +1,20 @@
-use std::collections::HashMap;
-
-use dolly::{prelude::*, rig::CameraRig};
-use winit::keyboard::{KeyCode, PhysicalKey};
-
 #[derive(Debug)]
 pub struct Camera {
     pub far: f32,
     pub near: f32,
     pub fov: f32,
     pub aspect_ratio: f32,
-    pub rig: CameraRig<LeftHanded>,
+    pub view: glam::Mat4,
 }
 
 impl Camera {
-    pub fn new(
-        near: f32,
-        far: f32,
-        fov: f32,
-        extent: [u32; 2],
-        rig: CameraRig<LeftHanded>,
-    ) -> Self {
+    pub fn new(near: f32, far: f32, fov: f32, extent: [u32; 2]) -> Self {
         Self {
             far,
             near,
             fov,
             aspect_ratio: extent[0] as f32 / extent[1] as f32,
-            rig,
+            view: glam::Mat4::IDENTITY,
         }
     }
 
@@ -34,63 +23,64 @@ impl Camera {
     }
 
     pub fn view(&self) -> glam::Mat4 {
-        glam::Mat4::from_rotation_translation(
-            self.rig.final_transform.rotation.into(),
-            self.rig.final_transform.position.into(),
-        )
+        self.view
     }
 
     pub fn resize(&mut self, extent: [u32; 2]) {
         self.aspect_ratio = extent[0] as f32 / extent[1] as f32;
     }
+}
 
-    pub fn update(&mut self, keys: &HashMap<PhysicalKey, bool>, dt: f32) {
-        let mut direction = glam::Vec3::ZERO;
+pub struct FpsController {
+    sensivity: f32,
+    speed: f32,
+    yaw: f32,
+    pitch: f32,
 
-        if keys
-            .get(&PhysicalKey::Code(KeyCode::KeyW))
-            .is_some_and(|v| *v)
-        {
-            direction.z += 1.0;
-        }
+    pub position: glam::Vec3,
+}
 
-        if keys
-            .get(&PhysicalKey::Code(KeyCode::KeyS))
-            .is_some_and(|v| *v)
-        {
-            direction.z -= 1.0;
-        }
-
-        if keys
-            .get(&PhysicalKey::Code(KeyCode::KeyD))
-            .is_some_and(|v| *v)
-        {
-            direction.x += 1.0;
-        }
-
-        if keys
-            .get(&PhysicalKey::Code(KeyCode::KeyA))
-            .is_some_and(|v| *v)
-        {
-            direction.x -= 1.0;
-        }
-
-        direction = direction.normalize();
-
-        if direction.length() > f32::EPSILON {
-            let quat: glam::Quat = self.rig.final_transform.rotation.into();
-
-            self.rig
-                .driver_mut::<dolly::prelude::Position>()
-                .translate(quat * direction * dt * 10.0);
-
-            self.rig.update(dt);
+impl FpsController {
+    pub fn new(sensivity: f32, speed: f32) -> Self {
+        Self {
+            sensivity,
+            speed,
+            yaw: 0.0,
+            pitch: 0.0,
+            position: glam::Vec3::ZERO,
         }
     }
 
-    pub fn rotate(&mut self, dx: f32, dy: f32) {
-        self.rig
-            .driver_mut::<YawPitch>()
-            .rotate_yaw_pitch(-0.3 * dx as f32, -0.3 * dy as f32);
+    pub fn update_position(&mut self, dt: f32, camera: &mut Camera, direction: glam::Vec3) {
+        let forward = glam::Vec3::new(
+            self.yaw.cos() * self.pitch.cos(),
+            self.pitch.sin(),
+            self.yaw.sin() * self.pitch.cos(),
+        );
+        let right = glam::Vec3::Y.cross(forward).normalize();
+        let up = right.cross(forward);
+
+        self.position +=
+            (forward * direction.z + right * direction.x + up * direction.y) * self.speed * dt;
+
+        camera.view = glam::Mat4::look_at_lh(self.position, self.position + forward, glam::Vec3::Y);
+    }
+
+    pub fn update_yaw_pitch(&mut self, camera: &mut Camera, x: f32, y: f32) {
+        self.yaw -= x * self.sensivity;
+        self.pitch -= y * self.sensivity;
+
+        self.pitch = self.pitch.clamp(
+            -std::f32::consts::FRAC_PI_2 + 0.1,
+            std::f32::consts::FRAC_PI_2 - 0.1,
+        );
+
+        let forward = glam::Vec3::new(
+            self.yaw.cos() * self.pitch.cos(),
+            self.pitch.sin(),
+            self.yaw.sin() * self.pitch.cos(),
+        );
+
+        camera.view = glam::Mat4::look_at_lh(self.position, self.position + forward, glam::Vec3::Y);
     }
 }

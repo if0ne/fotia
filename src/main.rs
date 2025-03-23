@@ -1,8 +1,10 @@
 use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 use collections::handle::Handle;
-use dolly::{prelude::*, rig::CameraRig};
-use engine::{camera::Camera, gltf::GltfScene};
+use engine::{
+    camera::{Camera, FpsController},
+    gltf::GltfScene,
+};
 use glam::vec2;
 use hecs::World;
 use multi_gpu_renderer::{
@@ -29,7 +31,7 @@ use timer::GameTimer;
 use tracing::info;
 use tracing_subscriber::layer::SubscriberExt;
 use winit::{
-    keyboard::PhysicalKey,
+    keyboard::{KeyCode, PhysicalKey},
     raw_window_handle::{HasWindowHandle, RawWindowHandle},
 };
 
@@ -70,6 +72,7 @@ pub struct Application<D: RenderDevice> {
     pub frames_in_flight: usize,
     pub frame_idx: usize,
     pub camera: Camera,
+    pub fps_controller: FpsController,
 
     pub buffer: Handle<Buffer>,
     pub global_argument: Handle<ShaderArgument>,
@@ -126,18 +129,14 @@ impl Application<DxDevice> {
 
         let mut world = World::new();
 
-        let camera = CameraRig::builder()
-            .with(Position::new(glam::Vec3::Y))
-            .with(YawPitch::new())
-            .with(Smooth::new_position_rotation(1.0, 1.0))
-            .build();
+        let fps_controller = FpsController::new(0.003, 100.0);
 
         let camera = Camera {
             far: 1000.0,
             near: 0.1,
             fov: 90.0f32.to_radians(),
             aspect_ratio: width as f32 / height as f32,
-            rig: camera,
+            view: glam::Mat4::IDENTITY,
         };
 
         let buffer = rs.create_buffer_handle();
@@ -188,6 +187,7 @@ impl Application<DxDevice> {
             frames_in_flight: 3,
             frame_idx: 0,
             camera,
+            fps_controller,
 
             buffer,
             global_argument,
@@ -200,7 +200,49 @@ impl Application<DxDevice> {
 
 impl<D: RenderDevice> Application<D> {
     fn update(&mut self) {
-        self.camera.update(&self.keys, self.timer.delta_time());
+        let mut direction = glam::Vec3::ZERO;
+
+        if self
+            .keys
+            .get(&PhysicalKey::Code(KeyCode::KeyW))
+            .is_some_and(|v| *v)
+        {
+            direction.z += 1.0;
+        }
+
+        if self
+            .keys
+            .get(&PhysicalKey::Code(KeyCode::KeyS))
+            .is_some_and(|v| *v)
+        {
+            direction.z -= 1.0;
+        }
+
+        if self
+            .keys
+            .get(&PhysicalKey::Code(KeyCode::KeyD))
+            .is_some_and(|v| *v)
+        {
+            direction.x += 1.0;
+        }
+
+        if self
+            .keys
+            .get(&PhysicalKey::Code(KeyCode::KeyA))
+            .is_some_and(|v| *v)
+        {
+            direction.x -= 1.0;
+        }
+
+        direction = direction.normalize();
+
+        if direction.length() > f32::EPSILON {
+            self.fps_controller.update_position(
+                self.timer.delta_time(),
+                &mut self.camera,
+                direction,
+            );
+        }
 
         let view = self.camera.view();
         let proj = self.camera.proj();
@@ -216,7 +258,7 @@ impl<D: RenderDevice> Application<D> {
                     inv_view: view.inverse(),
                     inv_proj: proj.inverse(),
                     inv_proj_view: (proj * view).inverse(),
-                    eye_pos: self.camera.rig.final_transform.position.into(),
+                    eye_pos: self.fps_controller.position,
                     _pad0: 0.0,
                     screen_dim: vec2(self.width as f32, self.height as f32),
                     _pad1: Default::default(),
@@ -399,7 +441,11 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
     ) {
         match event {
             winit::event::DeviceEvent::MouseMotion { delta } => {
-                self.camera.rotate(delta.0 as f32, delta.1 as f32);
+                self.fps_controller.update_yaw_pitch(
+                    &mut self.camera,
+                    delta.0 as f32,
+                    delta.1 as f32,
+                );
             }
             _ => {}
         }
