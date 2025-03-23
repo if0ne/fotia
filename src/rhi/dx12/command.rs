@@ -90,7 +90,7 @@ impl RenderCommandDevice for DxDevice {
     }
 
     fn create_resource_uploader(&self) -> Self::ResourceUploader {
-        let queue = self.create_command_queue(CommandType::Transfer, None);
+        let queue = self.create_command_queue(CommandType::Graphics, None);
 
         DxResourceUploader {
             queue,
@@ -600,6 +600,9 @@ impl IoCommandBuffer for DxIoCommandBuffer {
         let staging =
             device.create_buffer(BufferDesc::cpu_to_gpu(texture.size, BufferUsages::Copy));
 
+        self.buffer
+            .set_barriers([Barrier::Texture(texture, ResourceState::CopyDest)].into_iter());
+
         self.buffer.list.update_subresources_fixed::<1, _, _>(
             &texture.raw,
             &staging.raw,
@@ -609,6 +612,9 @@ impl IoCommandBuffer for DxIoCommandBuffer {
                 texture.desc.format.bytes_per_pixel() * texture.desc.extent[0] as usize,
             )],
         );
+
+        self.buffer
+            .set_barriers([Barrier::Texture(texture, ResourceState::Shader)].into_iter());
 
         self.temps.push(staging);
     }

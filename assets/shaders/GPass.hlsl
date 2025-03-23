@@ -67,7 +67,7 @@ PixelShaderOutput PSMain(PixelInput input) {
     float3x3 tbn = float3x3(t, b, n);
     float3 normal = normalize(mul(normal_sample, tbn));
 
-    output.diffuse = material_data.diffuse;
+    output.diffuse = diffuse_t.Sample(linear_clamp_s, input.uv) * material_data.diffuse;
     output.normal = pack_normal_to_texture(normal);
     output.material = float4(material_data.fresnel_r0, material_data.roughness, 0.0, input.pos.z);
 
