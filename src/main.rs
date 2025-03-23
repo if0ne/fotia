@@ -2,11 +2,12 @@ use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 use collections::handle::Handle;
 use dolly::{prelude::*, rig::CameraRig};
-use engine::camera::Camera;
+use engine::{camera::Camera, gltf::GltfScene};
 use glam::vec2;
 use hecs::World;
 use multi_gpu_renderer::{
-    GpuGlobals, graphs::single_gpu::SingleGpuShadows, pso::PsoCollection, shaders::ShaderCollection,
+    GpuGlobals, TexturePlaceholders, create_multi_gpu_scene, graphs::single_gpu::SingleGpuShadows,
+    pso::PsoCollection, shaders::ShaderCollection,
 };
 use ra::{
     command::{Barrier, RenderCommandContext, RenderCommandEncoder},
@@ -72,6 +73,8 @@ pub struct Application<D: RenderDevice> {
 
     pub buffer: Handle<Buffer>,
     pub global_argument: Handle<ShaderArgument>,
+
+    pub placeholders: TexturePlaceholders,
 }
 
 fn main() {
@@ -121,7 +124,7 @@ impl Application<DxDevice> {
             3,
         );
 
-        let world = World::new();
+        let mut world = World::new();
 
         let camera = CameraRig::builder()
             .with(Position::new(glam::Vec3::Y))
@@ -161,6 +164,11 @@ impl Application<DxDevice> {
             );
         });
 
+        let placeholders = TexturePlaceholders::new(&rs, &group);
+
+        let scene = GltfScene::load("../assets/scenes/pica_pica_-_mini_diorama_01/scene.gltf");
+        create_multi_gpu_scene(scene, &mut world, &rs, &group, 3, &placeholders);
+
         Application {
             title: title.to_string(),
             width,
@@ -183,6 +191,7 @@ impl Application<DxDevice> {
 
             buffer,
             global_argument,
+            placeholders,
 
             keys: HashMap::new(),
         }

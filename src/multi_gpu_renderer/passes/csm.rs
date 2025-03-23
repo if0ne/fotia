@@ -4,7 +4,7 @@ use hecs::World;
 
 use crate::{
     collections::handle::Handle,
-    engine::{GpuTransform, GpuTransformComponent, MeshComponent, camera::Camera},
+    engine::{GpuMeshComponent, GpuTransform, GpuTransformComponent, camera::Camera},
     multi_gpu_renderer::{
         csm::{Cascade, CascadedShadowMaps, Cascades},
         pso::PsoCollection,
@@ -187,7 +187,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
                 );
 
                 for (_, (transform, mesh)) in world
-                    .query::<(&GpuTransformComponent, &MeshComponent)>()
+                    .query::<(&GpuTransformComponent, &GpuMeshComponent)>()
                     .iter()
                 {
                     encoder.bind_shader_argument(
