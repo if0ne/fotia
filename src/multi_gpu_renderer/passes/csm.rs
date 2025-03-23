@@ -148,9 +148,11 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
 
         for i in 0..4 {
             self.ctx.update_buffer(
-                self.gpu_csm_buffer,
+                self.gpu_csm_proj_view_buffer,
                 4 * frame_index + i,
-                &[self.csm.cascades.cascade_proj_views[i]],
+                &[Cascade {
+                    proj_view: self.csm.cascades.cascade_proj_views[i],
+                }],
             );
         }
     }
@@ -164,11 +166,12 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
             encoder.set_render_pipeline(self.pso);
             encoder.clear_depth(self.dsv, None);
             encoder.set_topology(GeomTopology::Triangles);
+
             encoder.set_scissor(Scissor {
                 x: 0,
                 y: 0,
-                w: self.size,
-                h: self.size,
+                w: self.size * 2,
+                h: self.size * 2,
             });
 
             for i in 0..4 {
@@ -180,6 +183,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
                     w: self.size as f32,
                     h: self.size as f32,
                 });
+
                 encoder.bind_shader_argument(
                     0,
                     self.local_argument,
