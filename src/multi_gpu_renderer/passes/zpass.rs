@@ -5,7 +5,7 @@ use hecs::World;
 use crate::{
     collections::handle::Handle,
     engine::{GpuMeshComponent, GpuTransform, GpuTransformComponent},
-    multi_gpu_renderer::{pso::PsoCollection, GpuGlobals},
+    multi_gpu_renderer::{GpuGlobals, pso::PsoCollection},
     ra::{
         command::{Barrier, RenderCommandContext, RenderCommandEncoder, RenderEncoder},
         context::{Context, RenderDevice},

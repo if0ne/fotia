@@ -53,19 +53,17 @@ impl TexturePlaceholders {
         let diffuse = rs.create_texture_handle();
         let normal = rs.create_texture_handle();
 
-        group.parallel(|ctx| {
+        group.call(|ctx| {
             ctx.bind_texture(
                 diffuse,
-                TextureDesc::new_2d([1, 1], Format::Rgba8, TextureUsages::Resource)
+                TextureDesc::new_2d([1, 1], Format::Rgba8Unorm, TextureUsages::Resource)
                     .with_name("Diffuse Placeholder".into()),
                 Some(&[255, 255, 255, 255]),
             );
-        });
 
-        group.parallel(|ctx| {
             ctx.bind_texture(
                 normal,
-                TextureDesc::new_2d([1, 1], Format::Rgba8, TextureUsages::Resource)
+                TextureDesc::new_2d([1, 1], Format::Rgba8Unorm, TextureUsages::Resource)
                     .with_name("Normal Placeholder".into()),
                 Some(&[127, 127, 255, 255]),
             );
@@ -194,7 +192,7 @@ pub fn create_multi_gpu_scene<D: RenderDevice>(
                         *handle,
                         TextureDesc::new_2d(
                             [image.width(), image.height()],
-                            Format::Rgba8,
+                            Format::Rgba8Unorm,
                             TextureUsages::Resource,
                         )
                         .with_name(filename.into()),
@@ -235,20 +233,18 @@ pub fn create_multi_gpu_scene<D: RenderDevice>(
                 *argument,
                 ShaderArgumentDesc {
                     views: &[
-                        // ShaderEntry::Srv(
-                        //     material
-                        //         .diffuse_map
-                        //         .map(|idx| prepared.images[idx])
-                        //         .unwrap_or(dummy.diffuse),
-                        // ),
-                        // ShaderEntry::Srv(
-                        //     material
-                        //         .normal_map
-                        //         .map(|idx| prepared.images[idx])
-                        //         .unwrap_or(dummy.normal),
-                        // ),
-                        ShaderEntry::Srv(dummy.diffuse),
-                        ShaderEntry::Srv(dummy.normal),
+                        ShaderEntry::Srv(
+                            material
+                                .diffuse_map
+                                .map(|idx| prepared.images[idx])
+                                .unwrap_or(dummy.diffuse),
+                        ),
+                        ShaderEntry::Srv(
+                            material
+                                .normal_map
+                                .map(|idx| prepared.images[idx])
+                                .unwrap_or(dummy.normal),
+                        ),
                     ],
                     samplers: &[],
                     dynamic_buffer: Some(*buffer),

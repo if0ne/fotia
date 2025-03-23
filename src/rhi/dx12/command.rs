@@ -597,13 +597,15 @@ impl IoCommandBuffer for DxIoCommandBuffer {
     }
 
     fn load_to_texture(&mut self, device: &Self::Device, texture: &DxTexture, data: &'_ [u8]) {
+        debug_assert_eq!(data.len(), texture.size);
+
         let staging =
             device.create_buffer(BufferDesc::cpu_to_gpu(texture.size, BufferUsages::Copy));
 
         self.buffer
             .set_barriers([Barrier::Texture(texture, ResourceState::CopyDest)].into_iter());
 
-        self.buffer.list.update_subresources_fixed::<1, _, _>(
+        let copied = self.buffer.list.update_subresources_fixed::<1, _, _>(
             &texture.raw,
             &staging.raw,
             0,
@@ -612,6 +614,8 @@ impl IoCommandBuffer for DxIoCommandBuffer {
                 texture.desc.format.bytes_per_pixel() * texture.desc.extent[0] as usize,
             )],
         );
+
+        debug_assert!(copied > 0);
 
         self.buffer
             .set_barriers([Barrier::Texture(texture, ResourceState::Shader)].into_iter());
