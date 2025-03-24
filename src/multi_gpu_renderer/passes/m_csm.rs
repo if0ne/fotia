@@ -170,7 +170,7 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
             shared,
             working_texture: Default::default(),
             copy_texture: Default::default(),
-            states: Default::default(),
+            states: (0..frames_in_flight).map(|_| Default::default()).collect(),
             frames_in_flight,
         }
     }

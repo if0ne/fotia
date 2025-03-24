@@ -26,7 +26,7 @@ use crate::{
     rhi::command::CommandType,
 };
 
-pub struct SingleGpuShadows<D: RenderDevice> {
+pub struct MultiGpuShadows<D: RenderDevice> {
     pub ctx: Arc<ContextDual<D>>,
     pub zpass: ZPass<D>,
     pub csm: MultiCascadedShadowMapsPass<D>,
@@ -35,7 +35,7 @@ pub struct SingleGpuShadows<D: RenderDevice> {
     pub final_pass: GammaCorrectionPass<D>,
 }
 
-impl<D: RenderDevice> SingleGpuShadows<D> {
+impl<D: RenderDevice> MultiGpuShadows<D> {
     pub fn new(
         rs: Arc<RenderSystem>,
         ctx: Arc<ContextDual<D>>,

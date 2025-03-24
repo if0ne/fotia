@@ -5,11 +5,13 @@ use engine::{
     camera::{Camera, FpsController},
     gltf::GltfScene,
 };
-use glam::vec2;
+use glam::{vec2, vec3};
 use hecs::World;
 use multi_gpu_renderer::{
-    GpuGlobals, TexturePlaceholders, create_multi_gpu_scene, graphs::single_gpu::SingleGpuShadows,
-    pso::PsoCollection, shaders::ShaderCollection,
+    GpuGlobals, TexturePlaceholders, create_multi_gpu_scene,
+    graphs::{multi_gpu::MultiGpuShadows, single_gpu::SingleGpuShadows},
+    pso::PsoCollection,
+    shaders::ShaderCollection,
 };
 use ra::{
     command::{Barrier, RenderCommandContext, RenderCommandEncoder},
@@ -66,6 +68,7 @@ pub struct Application<D: RenderDevice> {
     pub psos: PsoCollection<D>,
 
     pub single_gpu: SingleGpuShadows<D>,
+    pub multi_gpu: MultiGpuShadows<D>,
 
     pub keys: HashMap<PhysicalKey, bool>,
 
@@ -127,6 +130,14 @@ impl Application<DxDevice> {
             3,
         );
 
+        let multi_gpu = MultiGpuShadows::new(
+            Arc::clone(&rs),
+            Arc::clone(&group),
+            [width, height],
+            &psos,
+            3,
+        );
+
         let mut world = World::new();
 
         let fps_controller = FpsController::new(0.003, 100.0);
@@ -182,6 +193,7 @@ impl Application<DxDevice> {
             shaders,
             psos,
             single_gpu,
+            multi_gpu,
 
             world,
             frames_in_flight: 3,
@@ -266,11 +278,11 @@ impl<D: RenderDevice> Application<D> {
             );
         });
 
-        self.single_gpu.update(
+        /*self.single_gpu.update(
             &self.camera,
             glam::Vec3::new(-1.0, -1.0, -1.0),
             self.frame_idx,
-        );
+        );*/
     }
 
     fn render(&mut self) {
@@ -289,10 +301,12 @@ impl<D: RenderDevice> Application<D> {
             ctx.enqueue(encoder);
 
             let time = std::time::Instant::now();
-            self.single_gpu.render(
+            self.multi_gpu.render(
                 &self.world,
                 self.global_argument,
                 frame.texture,
+                &self.camera,
+                vec3(-1.0, -1.0, -1.0),
                 self.frame_idx,
             );
             info!("CPU TIME: {:?}", time.elapsed());
@@ -412,7 +426,7 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                         [size.width, size.height],
                         &self.rs.handles,
                     );
-                    self.single_gpu.resize([size.width, size.height]);
+                    self.multi_gpu.resize([size.width, size.height]);
 
                     self.width = size.width;
                     self.height = size.height;
