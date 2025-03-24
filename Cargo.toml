@@ -10,7 +10,7 @@ glam = { version = "0.30.1", features = ["bytemuck"] }
 gltf = "1.4.1"
 hecs = "0.10.5"
 image = "0.25.5"
-mikktspace = "0.3.0"
+bevy_mikktspace = "0.15.3"
 parking_lot = "0.12.3"
 range-alloc = "0.1.4"
 smallvec = "1.14.0"
