@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use hecs::World;
-use tracing::debug;
 
 use crate::{
     collections::handle::Handle,
@@ -91,16 +90,12 @@ impl<D: RenderDevice> SingleGpuShadows<D> {
         swapchain_view: Handle<Texture>,
         frame_idx: usize,
     ) {
-        debug!("Render Zpass");
         self.zpass.render(globals, frame_idx, world);
 
-        debug!("Render CSM");
         self.csm.render(frame_idx, world);
 
-        debug!("Render GPass");
         self.gpass.render(globals, frame_idx, world);
 
-        debug!("Render Directional Light Pass");
         self.dir_pass.render(
             globals,
             self.csm.srv,
@@ -109,7 +104,6 @@ impl<D: RenderDevice> SingleGpuShadows<D> {
             frame_idx,
         );
 
-        debug!("Render Final Pass");
         self.final_pass.render(swapchain_view);
     }
 

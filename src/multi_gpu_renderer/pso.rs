@@ -217,7 +217,7 @@ impl<D: RenderDevice> PsoCollection<D> {
                         },
                         InputElementDesc {
                             semantic: VertexAttribute::Uv(0),
-                            format: VertexType::Float3,
+                            format: VertexType::Float2,
                         },
                     ],
                     depth_bias: 0,
@@ -255,7 +255,7 @@ impl<D: RenderDevice> PsoCollection<D> {
                     ],
                     static_samplers: &[StaticSampler {
                         ty: SamplerType::Sample(Filter::Linear),
-                        address_mode: AddressMode::Clamp,
+                        address_mode: AddressMode::Wrap,
                     }],
                 },
             );

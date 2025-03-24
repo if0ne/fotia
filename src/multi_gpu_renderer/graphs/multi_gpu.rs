@@ -1,7 +1,7 @@
 use std::sync::{Arc, atomic::Ordering};
 
 use hecs::World;
-use tracing::{debug, info};
+use tracing::info;
 
 use crate::{
     collections::handle::Handle,
@@ -184,13 +184,9 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
             }
         }
 
-        debug!("Render Zpass");
         self.zpass.render(globals, frame_idx, world);
 
-        debug!("Render GPass");
         self.gpass.render(globals, frame_idx, world);
-
-        debug!("Render Directional Light Pass");
 
         let copy_texture = if let MgpuState::WaitForRead(v) = self.csm.states[copy_texture] {
             if self.ctx.primary.is_ready_for(CommandType::Transfer, v) {
@@ -220,7 +216,6 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
             copy_texture,
         );
 
-        debug!("Render Final Pass");
         self.final_pass.render(swapchain_view);
     }
 

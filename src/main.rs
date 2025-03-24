@@ -473,6 +473,7 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                         [size.width, size.height],
                         &self.rs.handles,
                     );
+                    self.single_gpu.resize([size.width, size.height]);
                     self.multi_gpu.resize([size.width, size.height]);
 
                     self.width = size.width;
