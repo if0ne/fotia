@@ -226,7 +226,8 @@ impl GltfScene {
             }
         };
 
-        let xform = Mat4::IDENTITY;
+        let mut xform = Mat4::IDENTITY;
+        xform.z_axis *= -1.0;
         for node in scene.nodes() {
             iter_gltf_node_tree(&node, xform, &mut process_node);
         }
