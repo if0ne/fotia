@@ -252,7 +252,7 @@ impl<D: RenderDevice> GPass<D> {
                 TextureUsages::RenderTarget | TextureUsages::Resource,
             )
             .with_name("Diffuse Texture".into())
-            .with_color(ClearColor::Color([0.0, 0.0, 0.0, 1.0])),
+            .with_color(ClearColor::Color([0.301, 0.5607, 0.675, 1.0])),
             None,
         );
 

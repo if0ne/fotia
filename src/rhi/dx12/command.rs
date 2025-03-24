@@ -418,17 +418,18 @@ impl RenderCommandBuffer for DxCommandBuffer {
                     }
                     Subresource::Shared => {
                         match &texture.flavor {
-                            TextureFlavor::Binded { cross_state, .. } => {
+                            TextureFlavor::Binded {
+                                cross_state, cross, ..
+                            } => {
                                 let new_state = map_resource_state(resource_state);
                                 let old_state =
                                     std::mem::replace(&mut *cross_state.lock(), new_state);
 
                                 if old_state != new_state {
+                                    dbg!(old_state);
+                                    dbg!(new_state);
                                     Some(dx::ResourceBarrier::transition(
-                                        &texture.raw,
-                                        old_state,
-                                        new_state,
-                                        None,
+                                        &cross, old_state, new_state, None,
                                     ))
                                 } else {
                                     None

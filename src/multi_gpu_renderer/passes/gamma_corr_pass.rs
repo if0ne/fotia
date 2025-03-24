@@ -70,7 +70,6 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
             let mut encoder = cmd.render("Gamma Correction Pass".into(), &[swapchain_view], None);
             encoder.set_render_pipeline(self.pso);
 
-            encoder.clear_rt(swapchain_view, Some([1.0, 1.0, 1.0, 1.0]));
             encoder.set_viewport(Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -83,6 +82,7 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
                 w: self.extent[0],
                 h: self.extent[1],
             });
+            encoder.clear_rt(swapchain_view, Some([1.0, 1.0, 1.0, 1.0]));
 
             encoder.set_topology(GeomTopology::Triangles);
             encoder.bind_shader_argument(0, self.argument, 0);
