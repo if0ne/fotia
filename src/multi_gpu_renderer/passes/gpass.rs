@@ -14,7 +14,7 @@ use crate::{
         system::RenderSystem,
     },
     rhi::{
-        command::CommandType,
+        command::{CommandType, Subresource},
         resources::{TextureDesc, TextureUsages, TextureViewDesc, TextureViewType},
         types::{ClearColor, Format, GeomTopology, IndexType, ResourceState, Scissor, Viewport},
     },
@@ -156,11 +156,31 @@ impl<D: RenderDevice> GPass<D> {
     pub fn render(&self, globals: Handle<ShaderArgument>, frame_idx: usize, world: &World) {
         let mut cmd = self.ctx.create_encoder(CommandType::Graphics);
         cmd.set_barriers(&[
-            Barrier::Texture(self.diffuse, ResourceState::RenderTarget),
-            Barrier::Texture(self.normal, ResourceState::RenderTarget),
-            Barrier::Texture(self.material, ResourceState::RenderTarget),
-            Barrier::Texture(self.accum, ResourceState::RenderTarget),
-            Barrier::Texture(self.depth, ResourceState::DepthRead),
+            Barrier::Texture(
+                self.diffuse,
+                ResourceState::RenderTarget,
+                Subresource::Local(None),
+            ),
+            Barrier::Texture(
+                self.normal,
+                ResourceState::RenderTarget,
+                Subresource::Local(None),
+            ),
+            Barrier::Texture(
+                self.material,
+                ResourceState::RenderTarget,
+                Subresource::Local(None),
+            ),
+            Barrier::Texture(
+                self.accum,
+                ResourceState::RenderTarget,
+                Subresource::Local(None),
+            ),
+            Barrier::Texture(
+                self.depth,
+                ResourceState::DepthRead,
+                Subresource::Local(None),
+            ),
         ]);
 
         {

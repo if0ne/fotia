@@ -23,7 +23,7 @@ use crate::{
         system::RenderSystem,
     },
     rhi::{
-        command::CommandType,
+        command::{CommandType, Subresource},
         resources::{
             BufferDesc, BufferUsages, TextureDesc, TextureUsages, TextureViewDesc, TextureViewType,
         },
@@ -205,6 +205,7 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
             cmd.set_barriers(&[Barrier::Texture(
                 self.shared[frame_idx],
                 ResourceState::DepthWrite,
+                Subresource::Local(None),
             )]);
 
             {

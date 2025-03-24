@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::rhi::{
     command::{
         CommandType, RenderCommandBuffer, RenderCommandDevice, RenderCommandQueue, RenderEncoder,
+        TransferEncoder,
     },
     resources::RenderResourceDevice,
     shader::RenderShaderDevice,
@@ -23,6 +24,7 @@ pub trait RenderDevice:
                     ShaderArgument = Self::ShaderArgument,
                     RasterPipeline = Self::RasterPipeline,
                 >,
+                TransferEncoder<'a>: TransferEncoder<Texture = Self::Texture>,
             >,
             Event = Self::Event,
         >,
@@ -45,6 +47,7 @@ impl<T> RenderDevice for T where
                         ShaderArgument = T::ShaderArgument,
                         RasterPipeline = T::RasterPipeline,
                     >,
+                    TransferEncoder<'a>: TransferEncoder<Texture = T::Texture>,
                 >,
                 Event = T::Event,
             >,

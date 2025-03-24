@@ -14,10 +14,16 @@ pub enum CommandType {
     Transfer,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Subresource {
+    Local(Option<u32>),
+    Shared,
+}
+
 #[derive(Debug)]
 pub enum Barrier<'a, D: RenderResourceDevice> {
     Buffer(&'a D::Buffer, ResourceState),
-    Texture(&'a D::Texture, ResourceState),
+    Texture(&'a D::Texture, ResourceState, Subresource),
 }
 
 pub trait RenderCommandDevice: RenderResourceDevice {
@@ -82,7 +88,12 @@ pub trait IoCommandBuffer {
 
 pub trait RenderCommandBuffer {
     type Device: RenderResourceDevice;
+
     type RenderEncoder<'a>
+    where
+        Self: 'a;
+
+    type TransferEncoder<'a>
     where
         Self: 'a;
 
@@ -98,6 +109,8 @@ pub trait RenderCommandBuffer {
         targets: impl IntoIterator<Item = &'a <Self::Device as RenderResourceDevice>::Texture>,
         depth: Option<&<Self::Device as RenderResourceDevice>::Texture>,
     ) -> Self::RenderEncoder<'_>;
+
+    fn transfer<'a>(&mut self, label: Cow<'static, str>) -> Self::TransferEncoder<'_>;
 
     fn resolve_timestamp_data(&mut self) -> std::ops::Range<usize>;
 }
@@ -136,4 +149,11 @@ pub trait RenderEncoder {
 
     fn draw(&self, count: u32, start_vertex: u32);
     fn draw_indexed(&self, count: u32, start_index: u32, base_index: u32);
+}
+
+pub trait TransferEncoder {
+    type Texture;
+
+    fn pull_texture(&self, texture: &Self::Texture);
+    fn push_texture(&self, texture: &Self::Texture);
 }

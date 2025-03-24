@@ -23,7 +23,7 @@ use ra::{
 };
 use rhi::{
     backend::{Api, DebugFlags},
-    command::CommandType,
+    command::{CommandType, Subresource},
     dx12::device::DxDevice,
     resources::BufferUsages,
     swapchain::{PresentMode, SwapchainDesc},
@@ -297,7 +297,11 @@ impl<D: RenderDevice> Application<D> {
             let timings = encoder.begin(ctx);
             info!("Timings: {:?}", timings);
 
-            encoder.set_barriers(&[Barrier::Texture(frame.texture, ResourceState::RenderTarget)]);
+            encoder.set_barriers(&[Barrier::Texture(
+                frame.texture,
+                ResourceState::RenderTarget,
+                Subresource::Local(None),
+            )]);
             ctx.enqueue(encoder);
 
             let time = std::time::Instant::now();
@@ -312,7 +316,11 @@ impl<D: RenderDevice> Application<D> {
             info!("CPU TIME: {:?}", time.elapsed());
 
             let mut encoder = ctx.create_encoder(CommandType::Graphics);
-            encoder.set_barriers(&[Barrier::Texture(frame.texture, ResourceState::Present)]);
+            encoder.set_barriers(&[Barrier::Texture(
+                frame.texture,
+                ResourceState::Present,
+                Subresource::Local(None),
+            )]);
 
             ctx.commit(encoder);
             frame.last_access = ctx.submit(CommandType::Graphics);

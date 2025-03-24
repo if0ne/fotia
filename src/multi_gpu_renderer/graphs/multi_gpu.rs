@@ -17,13 +17,16 @@ use crate::{
         pso::PsoCollection,
     },
     ra::{
-        command::{RenderCommandContext, RenderCommandEncoder},
+        command::{Barrier, RenderCommandContext, RenderCommandEncoder, TransferEncoder},
         context::{ContextDual, RenderDevice},
         resources::Texture,
         shader::ShaderArgument,
         system::RenderSystem,
     },
-    rhi::command::CommandType,
+    rhi::{
+        command::{CommandType, Subresource},
+        types::ResourceState,
+    },
 };
 
 pub struct MultiGpuShadows<D: RenderDevice> {
@@ -121,7 +124,24 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
                 self.csm.render(working_texture, world);
 
                 let mut cmd = ctx.create_encoder(CommandType::Graphics);
-                // TODO: Copy Texture from local to cross
+
+                cmd.set_barriers(&[
+                    Barrier::Texture(
+                        self.csm.shared[working_texture],
+                        ResourceState::CopySrc,
+                        Subresource::Local(None),
+                    ),
+                    Barrier::Texture(
+                        self.csm.shared[working_texture],
+                        ResourceState::CopyDst,
+                        Subresource::Shared,
+                    ),
+                ]);
+                {
+                    let encoder = cmd.transfer("Push CSM".into());
+                    encoder.push_texture(self.csm.shared[working_texture]);
+                }
+
                 ctx.commit(cmd);
 
                 self.csm.states[working_texture] =
@@ -140,7 +160,22 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
                     let timings = cmd.begin(ctx);
                     info!("Copy Timings: {:?}", timings);
 
-                    // TODO: Copy Texture from cross to local
+                    cmd.set_barriers(&[
+                        Barrier::Texture(
+                            self.csm.shared[copy_texture],
+                            ResourceState::CopyDst,
+                            Subresource::Local(None),
+                        ),
+                        Barrier::Texture(
+                            self.csm.shared[copy_texture],
+                            ResourceState::CopySrc,
+                            Subresource::Shared,
+                        ),
+                    ]);
+                    {
+                        let encoder = cmd.transfer("Pull CSM".into());
+                        encoder.pull_texture(self.csm.shared[copy_texture]);
+                    }
 
                     ctx.commit(cmd);
                     self.csm.states[copy_texture] =
@@ -151,9 +186,6 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
 
         debug!("Render Zpass");
         self.zpass.render(globals, frame_idx, world);
-
-        debug!("Render CSM");
-        self.csm.render(frame_idx, world);
 
         debug!("Render GPass");
         self.gpass.render(globals, frame_idx, world);
@@ -180,12 +212,12 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
             }
         };
 
-        // TODO: copy_texture index for cascades buffer
         self.dir_pass.render(
             globals,
             self.csm.shared[copy_texture],
             self.csm.argument[copy_texture],
             frame_idx,
+            copy_texture,
         );
 
         debug!("Render Final Pass");

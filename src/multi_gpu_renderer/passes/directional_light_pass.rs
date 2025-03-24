@@ -15,7 +15,7 @@ use crate::{
         system::RenderSystem,
     },
     rhi::{
-        command::CommandType,
+        command::{CommandType, Subresource},
         resources::{BufferDesc, BufferUsages},
         types::{GeomTopology, ResourceState, Scissor, Viewport},
     },
@@ -155,14 +155,31 @@ impl<D: RenderDevice> DirectionalLightPass<D> {
         csm: Handle<Texture>,
         csm_data: Handle<ShaderArgument>,
         frame_idx: usize,
+        cascade_idx: usize,
     ) {
         let mut cmd = self.ctx.create_encoder(CommandType::Graphics);
         cmd.set_barriers(&[
-            Barrier::Texture(self.accum, ResourceState::RenderTarget),
-            Barrier::Texture(self.normal_srv, ResourceState::Shader),
-            Barrier::Texture(self.diffuse_srv, ResourceState::Shader),
-            Barrier::Texture(self.material_srv, ResourceState::Shader),
-            Barrier::Texture(csm, ResourceState::Shader),
+            Barrier::Texture(
+                self.accum,
+                ResourceState::RenderTarget,
+                Subresource::Local(None),
+            ),
+            Barrier::Texture(
+                self.normal_srv,
+                ResourceState::Shader,
+                Subresource::Local(None),
+            ),
+            Barrier::Texture(
+                self.diffuse_srv,
+                ResourceState::Shader,
+                Subresource::Local(None),
+            ),
+            Barrier::Texture(
+                self.material_srv,
+                ResourceState::Shader,
+                Subresource::Local(None),
+            ),
+            Barrier::Texture(csm, ResourceState::Shader, Subresource::Local(None)),
         ]);
 
         {
@@ -186,12 +203,16 @@ impl<D: RenderDevice> DirectionalLightPass<D> {
             encoder.set_topology(GeomTopology::Triangles);
             encoder.bind_shader_argument(0, globals, size_of::<GpuGlobals>() * frame_idx);
             encoder.bind_shader_argument(1, self.argument, 0);
-            encoder.bind_shader_argument(2, csm_data, size_of::<Cascades>() * frame_idx);
+            encoder.bind_shader_argument(2, csm_data, size_of::<Cascades>() * cascade_idx);
 
             encoder.draw(3, 0);
         }
 
-        cmd.set_barriers(&[Barrier::Texture(csm, ResourceState::Common)]);
+        cmd.set_barriers(&[Barrier::Texture(
+            csm,
+            ResourceState::Common,
+            Subresource::Local(None),
+        )]);
 
         self.ctx.enqueue(cmd);
     }
