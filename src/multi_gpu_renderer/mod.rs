@@ -111,7 +111,7 @@ pub fn create_multi_gpu_scene<D: RenderDevice>(
         for (buffer, argument) in prepared.submeshes.iter() {
             let data = (0..frames_in_flight)
                 .map(|_| GpuTransform {
-                    mat: glam::Mat4::from_scale(vec3(5.0, 5.0, 5.0)),
+                    mat: glam::Mat4::from_scale(vec3(25.0, 25.0, 25.0)),
                 })
                 .collect::<Vec<_>>();
 
