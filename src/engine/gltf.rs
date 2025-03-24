@@ -182,7 +182,7 @@ impl GltfScene {
                     }
 
                     if !tangents_found && uvs_found {
-                        mikktspace::generate_tangents(&mut TangentCalcContext {
+                        bevy_mikktspace::generate_tangents(&mut TangentCalcContext {
                             indices: indices.as_slice(),
                             positions: positions.as_slice(),
                             normals: normals.as_slice(),
@@ -278,7 +278,7 @@ struct TangentCalcContext<'a> {
     tangents: &'a mut [[f32; 4]],
 }
 
-impl<'a> mikktspace::Geometry for TangentCalcContext<'a> {
+impl<'a> bevy_mikktspace::Geometry for TangentCalcContext<'a> {
     fn num_faces(&self) -> usize {
         self.indices.len() / 3
     }
