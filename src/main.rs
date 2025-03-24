@@ -51,6 +51,21 @@ pub struct WindowContext<D: RenderDevice> {
     pub swapchain: Swapchain<D>,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum RenderMode {
+    SingleGpu,
+    MultiGpu,
+}
+
+impl RenderMode {
+    pub fn next(&mut self) {
+        match *self {
+            RenderMode::SingleGpu => *self = RenderMode::MultiGpu,
+            RenderMode::MultiGpu => *self = RenderMode::SingleGpu,
+        }
+    }
+}
+
 pub struct Application<D: RenderDevice> {
     pub title: String,
     pub width: u32,
@@ -69,6 +84,7 @@ pub struct Application<D: RenderDevice> {
 
     pub single_gpu: SingleGpuShadows<D>,
     pub multi_gpu: MultiGpuShadows<D>,
+    pub render_mode: RenderMode,
 
     pub keys: HashMap<PhysicalKey, bool>,
 
@@ -96,12 +112,12 @@ fn main() {
     let event_loop = winit::event_loop::EventLoop::new().expect("failed to create event loop");
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
-    let mut app = Application::new("Fotia", 800, 600);
+    let mut app = Application::new(800, 600);
     event_loop.run_app(&mut app).expect("failed to run app");
 }
 
 impl Application<DxDevice> {
-    fn new(title: impl ToString, width: u32, height: u32) -> Application<DxDevice> {
+    fn new(width: u32, height: u32) -> Application<DxDevice> {
         let rs = Arc::new(RenderSystem::new(&[RenderBackendSettings {
             api: RenderBackend::Dx12,
             debug: if cfg!(debug_assertions) {
@@ -180,7 +196,7 @@ impl Application<DxDevice> {
         create_multi_gpu_scene(scene, &mut world, &rs, &group, 3, &placeholders);
 
         Application {
-            title: title.to_string(),
+            title: format!("Fotia Render Mode: {:?}", RenderMode::SingleGpu),
             width,
             height,
 
@@ -194,6 +210,7 @@ impl Application<DxDevice> {
             psos,
             single_gpu,
             multi_gpu,
+            render_mode: RenderMode::SingleGpu,
 
             world,
             frames_in_flight: 3,
@@ -278,11 +295,13 @@ impl<D: RenderDevice> Application<D> {
             );
         });
 
-        /*self.single_gpu.update(
-            &self.camera,
-            glam::Vec3::new(-1.0, -1.0, -1.0),
-            self.frame_idx,
-        );*/
+        if let RenderMode::SingleGpu = self.render_mode {
+            self.single_gpu.update(
+                &self.camera,
+                glam::Vec3::new(-1.0, -1.0, -1.0),
+                self.frame_idx,
+            );
+        }
     }
 
     fn render(&mut self) {
@@ -305,14 +324,28 @@ impl<D: RenderDevice> Application<D> {
             ctx.enqueue(encoder);
 
             let time = std::time::Instant::now();
-            self.multi_gpu.render(
-                &self.world,
-                self.global_argument,
-                frame.texture,
-                &self.camera,
-                vec3(-1.0, -1.0, -1.0),
-                self.frame_idx,
-            );
+
+            match self.render_mode {
+                RenderMode::SingleGpu => {
+                    self.single_gpu.render(
+                        &self.world,
+                        self.global_argument,
+                        frame.texture,
+                        self.frame_idx,
+                    );
+                }
+                RenderMode::MultiGpu => {
+                    self.multi_gpu.render(
+                        &self.world,
+                        self.global_argument,
+                        frame.texture,
+                        &self.camera,
+                        vec3(-1.0, -1.0, -1.0),
+                        self.frame_idx,
+                    );
+                }
+            }
+
             info!("CPU TIME: {:?}", time.elapsed());
 
             let mut encoder = ctx.create_encoder(CommandType::Graphics);
@@ -414,6 +447,12 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                 winit::event::ElementState::Pressed => {
                     if event.physical_key == winit::keyboard::KeyCode::Escape {
                         event_loop.exit();
+                    } else if event.physical_key == KeyCode::Digit1 {
+                        self.render_mode = RenderMode::SingleGpu;
+                        self.title = format!("Fotia Render Mode: {:?}", self.render_mode);
+                    } else if event.physical_key == KeyCode::Digit2 {
+                        self.render_mode = RenderMode::MultiGpu;
+                        self.title = format!("Fotia Render Mode: {:?}", self.render_mode);
                     }
 
                     self.keys.insert(event.physical_key, true);
