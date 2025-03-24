@@ -323,12 +323,14 @@ impl DxDevice {
 
         let view = desc.to_default_view();
 
-        let descriptor = if desc.usage.contains(TextureUsages::RenderTarget) {
-            Some(self.descriptors.allocate(dx::DescriptorHeapType::Rtv, 1))
-        } else if desc.usage.contains(TextureUsages::DepthTarget) {
-            Some(self.descriptors.allocate(dx::DescriptorHeapType::Dsv, 1))
-        } else {
-            None
+        let descriptor = match view.view_ty {
+            TextureViewType::RenderTarget => {
+                Some(self.descriptors.allocate(dx::DescriptorHeapType::Rtv, 1))
+            }
+            TextureViewType::DepthStencil => {
+                Some(self.descriptors.allocate(dx::DescriptorHeapType::Dsv, 1))
+            }
+            _ => None,
         };
 
         if let Some(descriptor) = &descriptor {
@@ -386,12 +388,14 @@ impl DxDevice {
 
             let view = overrided_view.unwrap_or_else(|| desc.to_default_view());
 
-            let descriptor = if desc.usage.contains(TextureUsages::RenderTarget) {
-                Some(self.descriptors.allocate(dx::DescriptorHeapType::Rtv, 1))
-            } else if desc.usage.contains(TextureUsages::DepthTarget) {
-                Some(self.descriptors.allocate(dx::DescriptorHeapType::Dsv, 1))
-            } else {
-                None
+            let descriptor = match view.view_ty {
+                TextureViewType::RenderTarget => {
+                    Some(self.descriptors.allocate(dx::DescriptorHeapType::Rtv, 1))
+                }
+                TextureViewType::DepthStencil => {
+                    Some(self.descriptors.allocate(dx::DescriptorHeapType::Dsv, 1))
+                }
+                _ => None,
             };
 
             if let Some(descriptor) = &descriptor {
@@ -431,12 +435,14 @@ impl DxDevice {
 
             let view = overrided_view.unwrap_or_else(|| desc.to_default_view());
 
-            let descriptor = if desc.usage.contains(TextureUsages::RenderTarget) {
-                Some(self.descriptors.allocate(dx::DescriptorHeapType::Rtv, 1))
-            } else if desc.usage.contains(TextureUsages::DepthTarget) {
-                Some(self.descriptors.allocate(dx::DescriptorHeapType::Dsv, 1))
-            } else {
-                None
+            let descriptor = match view.view_ty {
+                TextureViewType::RenderTarget => {
+                    Some(self.descriptors.allocate(dx::DescriptorHeapType::Rtv, 1))
+                }
+                TextureViewType::DepthStencil => {
+                    Some(self.descriptors.allocate(dx::DescriptorHeapType::Dsv, 1))
+                }
+                _ => None,
             };
 
             if let Some(descriptor) = &descriptor {

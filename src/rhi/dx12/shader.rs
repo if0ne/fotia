@@ -159,15 +159,13 @@ impl RenderShaderDevice for DxDevice {
                         )),
                         views.cpu.advance(i, size),
                     ),
-                    ShaderEntry::Srv(texture) | ShaderEntry::Uav(texture) => {
-                        dbg!(&texture.desc.name);
-                        self.create_texture_view(
+                    ShaderEntry::Srv(texture) | ShaderEntry::Uav(texture) => self
+                        .create_texture_view(
                             views.cpu.advance(i, size),
                             &texture.raw,
                             &texture.view,
                             &texture.desc,
-                        )
-                    }
+                        ),
                 }
             }
 

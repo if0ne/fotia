@@ -129,13 +129,16 @@ impl<D: RenderDevice> RenderResourceContext for Context<D> {
         other: &Self,
         overrided_view: Option<TextureViewDesc>,
     ) {
-        let mut guard = other.mapper.textures.lock();
+        let guard = other.mapper.textures.lock();
         let Some(texture) = guard.get(handle) else {
             panic!("texture doesn't exist")
         };
 
         let texture = self.gpu.open_texture(texture, &other.gpu, overrided_view);
-        guard.set(handle, texture);
+        let mut self_guard = self.mapper.textures.lock();
+        if let Some(texture) = self_guard.set(handle, texture) {
+            self.gpu.destroy_texture(texture);
+        }
     }
 
     fn bind_sampler(&self, handle: Handle<Sampler>, desc: SamplerDesc) {

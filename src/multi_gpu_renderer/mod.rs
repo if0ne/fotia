@@ -96,6 +96,18 @@ pub fn create_multi_gpu_scene<D: RenderDevice>(
             Some(bytemuck::cast_slice(&scene.positions)),
         );
 
+        ctx.bind_buffer(
+            prepared.indices,
+            BufferDesc {
+                name: Some("Index Buffer".into()),
+                size: size_of_val(&scene.indices[..]),
+                stride: size_of::<u32>(),
+                usage: BufferUsages::Index,
+                memory_location: MemoryLocation::GpuToGpu,
+            },
+            Some(bytemuck::cast_slice(&scene.indices)),
+        );
+
         for (buffer, argument) in prepared.submeshes.iter() {
             let data = (0..frames_in_flight)
                 .map(|_| GpuTransform {
@@ -163,18 +175,6 @@ pub fn create_multi_gpu_scene<D: RenderDevice>(
                 memory_location: MemoryLocation::GpuToGpu,
             },
             Some(bytemuck::cast_slice(&scene.tangents)),
-        );
-
-        ctx.bind_buffer(
-            prepared.indices,
-            BufferDesc {
-                name: Some("Index Buffer".into()),
-                size: size_of_val(&scene.indices[..]),
-                stride: size_of::<u32>(),
-                usage: BufferUsages::Index,
-                memory_location: MemoryLocation::GpuToGpu,
-            },
-            Some(bytemuck::cast_slice(&scene.indices)),
         );
 
         for (handle, image) in prepared.images.iter().zip(scene.images.iter()) {
