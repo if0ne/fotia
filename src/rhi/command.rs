@@ -54,6 +54,9 @@ pub trait RenderCommandQueue: Send + Sync {
     fn wait_on_cpu(&self, value: SyncPoint);
     fn wait_until_complete(&self);
     fn wait_idle(&self);
+
+    fn is_ready(&self) -> bool;
+    fn is_ready_for(&self, v: u64) -> bool;
 }
 
 pub trait RenderResourceUploader: RenderCommandQueue<CommandBuffer: IoCommandBuffer> {

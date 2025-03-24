@@ -299,6 +299,14 @@ impl RenderCommandQueue for DxCommandQueue {
         let value = self.signal_event(&self.fence);
         self.wait_on_cpu(value);
     }
+
+    fn is_ready(&self) -> bool {
+        self.is_ready_for(self.fence.get_goal())
+    }
+
+    fn is_ready_for(&self, v: u64) -> bool {
+        self.fence.get_completed_value() >= v
+    }
 }
 
 #[derive(Debug)]
@@ -557,6 +565,14 @@ impl RenderCommandQueue for DxResourceUploader {
 
     fn wait_idle(&self) {
         self.queue.wait_idle();
+    }
+
+    fn is_ready(&self) -> bool {
+        self.queue.is_ready()
+    }
+
+    fn is_ready_for(&self, v: u64) -> bool {
+        self.queue.is_ready_for(v)
     }
 }
 
