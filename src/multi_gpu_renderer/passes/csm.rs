@@ -19,7 +19,7 @@ use crate::{
         system::RenderSystem,
     },
     rhi::{
-        command::CommandType,
+        command::{CommandType, Subresource},
         resources::{
             BufferDesc, BufferUsages, TextureDesc, TextureUsages, TextureViewDesc, TextureViewType,
         },
@@ -159,7 +159,11 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
 
     pub fn render(&self, frame_idx: usize, world: &World) {
         let mut cmd = self.ctx.create_encoder(CommandType::Graphics);
-        cmd.set_barriers(&[Barrier::Texture(self.dsv, ResourceState::DepthWrite)]);
+        cmd.set_barriers(&[Barrier::Texture(
+            self.dsv,
+            ResourceState::DepthWrite,
+            Subresource::Local(None),
+        )]);
 
         {
             let mut encoder = cmd.render("Cascaded Shadow Maps".into(), &[], Some(self.dsv));

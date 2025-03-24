@@ -6,7 +6,7 @@ use crate::{
         self,
         command::{
             CommandType, RenderCommandBuffer, RenderCommandDevice, RenderCommandQueue,
-            RenderEncoder as _, SyncPoint,
+            RenderEncoder as _, Subresource, SyncPoint, TransferEncoder as _,
         },
         types::{GeomTopology, IndexType, ResourceState, Scissor, Timings, Viewport},
     },
@@ -22,6 +22,13 @@ type CommandBuffer<D> =
     <<D as RenderCommandDevice>::CommandQueue as RenderCommandQueue>::CommandBuffer;
 
 type RenderEncoderType<'a, D> = <CommandBuffer<D> as RenderCommandBuffer>::RenderEncoder<'a>;
+type TransferEncoderType<'a, D> = <CommandBuffer<D> as RenderCommandBuffer>::TransferEncoder<'a>;
+
+#[derive(Clone, Copy)]
+pub enum Barrier {
+    Buffer(Handle<Buffer>, ResourceState),
+    Texture(Handle<Texture>, ResourceState, Subresource),
+}
 
 pub struct CommandQueue<D: RenderDevice> {
     pub(super) raw: D::CommandQueue,
@@ -215,6 +222,10 @@ pub trait RenderCommandEncoder<D: RenderDevice> {
     where
         Self: 'a;
 
+    type TransferEncoder<'a>
+    where
+        Self: 'a;
+
     fn begin(&mut self, ctx: &Context<D>) -> Option<Timings>;
 
     fn set_barriers(&mut self, barriers: &[Barrier]);
@@ -225,11 +236,18 @@ pub trait RenderCommandEncoder<D: RenderDevice> {
         targets: &[Handle<Texture>],
         depth: Option<Handle<Texture>>,
     ) -> Self::RenderEncoder<'_>;
+
+    fn transfer(&mut self, label: Cow<'static, str>) -> Self::TransferEncoder<'_>;
 }
 
 impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
     type RenderEncoder<'a>
         = RenderEncoderImpl<'a, D>
+    where
+        D: 'a;
+
+    type TransferEncoder<'a>
+        = TransferEncoderImpl<'a, D>
     where
         D: 'a;
 
@@ -246,9 +264,10 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
                 buffers.get(*handle).expect("failed to get buffer"),
                 *resource_state,
             ),
-            Barrier::Texture(handle, resource_state) => rhi::command::Barrier::Texture(
+            Barrier::Texture(handle, resource_state, sub) => rhi::command::Barrier::Texture(
                 textures.get(*handle).expect("failed to get buffer"),
                 *resource_state,
+                *sub,
             ),
         });
 
@@ -270,6 +289,15 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
         let raw = self.raw.render(label, targets, depth);
 
         Self::RenderEncoder {
+            raw,
+            mapper: &self.mapper,
+        }
+    }
+
+    fn transfer(&mut self, label: Cow<'static, str>) -> Self::TransferEncoder<'_> {
+        let raw = self.raw.transfer(label);
+
+        Self::TransferEncoder {
             raw,
             mapper: &self.mapper,
         }
@@ -371,8 +399,28 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub enum Barrier {
-    Buffer(Handle<Buffer>, ResourceState),
-    Texture(Handle<Texture>, ResourceState),
+pub struct TransferEncoderImpl<'a, D: RenderDevice> {
+    pub(super) raw: TransferEncoderType<'a, D>,
+    pub(super) mapper: &'a ResourceMapper<D>,
+}
+
+pub trait TransferEncoder {
+    fn pull_texture(&self, texture: Handle<Texture>);
+    fn push_texture(&self, texture: Handle<Texture>);
+}
+
+impl<'a, D: RenderDevice> TransferEncoder for TransferEncoderImpl<'a, D> {
+    fn pull_texture(&self, texture: Handle<Texture>) {
+        let guard = self.mapper.textures.lock();
+
+        self.raw
+            .pull_texture(guard.get(texture).expect("failed to get texture"));
+    }
+
+    fn push_texture(&self, texture: Handle<Texture>) {
+        let guard = self.mapper.textures.lock();
+
+        self.raw
+            .push_texture(guard.get(texture).expect("failed to get texture"));
+    }
 }

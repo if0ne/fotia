@@ -16,7 +16,8 @@ use smallvec::SmallVec;
 use crate::rhi::{
     command::{
         Barrier, CommandType, GpuEvent, IoCommandBuffer, RenderCommandBuffer, RenderCommandDevice,
-        RenderCommandQueue, RenderEncoder, RenderResourceUploader, SyncPoint,
+        RenderCommandQueue, RenderEncoder, RenderResourceUploader, Subresource, SyncPoint,
+        TransferEncoder,
     },
     resources::{
         Buffer, BufferDesc, BufferUsages, MemoryLocation, QueryHeap, RenderResourceDevice,
@@ -27,7 +28,7 @@ use crate::rhi::{
 use super::{
     conv::{map_command_buffer_type, map_geom_topology, map_resource_state},
     device::DxDevice,
-    resources::{DxBuffer, DxTexture, DxTimestampQuery},
+    resources::{DxBuffer, DxTexture, DxTimestampQuery, TextureFlavor},
     shader::{DxRasterPipeline, DxShaderArgument},
 };
 
@@ -332,6 +333,7 @@ impl DxCommandBuffer {
 impl RenderCommandBuffer for DxCommandBuffer {
     type Device = DxDevice;
     type RenderEncoder<'a> = DxRenderEncoder<'a>;
+    type TransferEncoder<'a> = DxTransferEncoder<'a>;
 
     fn ty(&self) -> CommandType {
         self.ty
@@ -398,21 +400,46 @@ impl RenderCommandBuffer for DxCommandBuffer {
                         None
                     }
                 }
-                Barrier::Texture(texture, resource_state) => {
-                    let new_state = map_resource_state(resource_state);
-                    let old_state = std::mem::replace(&mut *texture.state.lock(), new_state);
+                Barrier::Texture(texture, resource_state, sub) => match sub {
+                    Subresource::Local(sub) => {
+                        let new_state = map_resource_state(resource_state);
+                        let old_state = std::mem::replace(&mut *texture.state.lock(), new_state);
 
-                    if old_state != new_state {
-                        Some(dx::ResourceBarrier::transition(
-                            &texture.raw,
-                            old_state,
-                            new_state,
-                            None,
-                        ))
-                    } else {
-                        None
+                        if old_state != new_state {
+                            Some(dx::ResourceBarrier::transition(
+                                &texture.raw,
+                                old_state,
+                                new_state,
+                                sub,
+                            ))
+                        } else {
+                            None
+                        }
                     }
-                }
+                    Subresource::Shared => {
+                        match &texture.flavor {
+                            TextureFlavor::Binded { cross_state, .. } => {
+                                let new_state = map_resource_state(resource_state);
+                                let old_state =
+                                    std::mem::replace(&mut *cross_state.lock(), new_state);
+
+                                if old_state != new_state {
+                                    Some(dx::ResourceBarrier::transition(
+                                        &texture.raw,
+                                        old_state,
+                                        new_state,
+                                        None,
+                                    ))
+                                } else {
+                                    None
+                                }
+                            }
+                            _ => {
+                                None /* NOOP */
+                            }
+                        }
+                    }
+                },
             })
             .collect::<SmallVec<[_; 8]>>();
 
@@ -462,6 +489,13 @@ impl RenderCommandBuffer for DxCommandBuffer {
         self.allocator.query.cur_index = 0;
 
         range
+    }
+
+    fn transfer<'a>(&mut self, label: Cow<'static, str>) -> Self::TransferEncoder<'_> {
+        self.write_timestamp();
+        self.allocator.labels.push(label);
+
+        DxTransferEncoder { cmd: self }
     }
 }
 
@@ -620,8 +654,14 @@ impl IoCommandBuffer for DxIoCommandBuffer {
         let staging =
             device.create_buffer(BufferDesc::cpu_to_gpu(texture.size, BufferUsages::Copy));
 
-        self.buffer
-            .set_barriers([Barrier::Texture(texture, ResourceState::CopyDest)].into_iter());
+        self.buffer.set_barriers(
+            [Barrier::Texture(
+                texture,
+                ResourceState::CopyDst,
+                Subresource::Local(None),
+            )]
+            .into_iter(),
+        );
 
         let copied = self.buffer.list.update_subresources_fixed::<1, _, _>(
             &texture.raw,
@@ -635,8 +675,14 @@ impl IoCommandBuffer for DxIoCommandBuffer {
 
         debug_assert!(copied > 0);
 
-        self.buffer
-            .set_barriers([Barrier::Texture(texture, ResourceState::Shader)].into_iter());
+        self.buffer.set_barriers(
+            [Barrier::Texture(
+                texture,
+                ResourceState::Shader,
+                Subresource::Local(None),
+            )]
+            .into_iter(),
+        );
 
         self.temps.push(staging);
     }
@@ -830,6 +876,39 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
 }
 
 impl Drop for DxRenderEncoder<'_> {
+    fn drop(&mut self) {
+        self.cmd.write_timestamp();
+    }
+}
+
+#[derive(Debug)]
+pub struct DxTransferEncoder<'a> {
+    pub(super) cmd: &'a mut DxCommandBuffer,
+}
+
+impl<'a> TransferEncoder for DxTransferEncoder<'a> {
+    type Texture = DxTexture;
+
+    fn pull_texture(&self, texture: &Self::Texture) {
+        match &texture.flavor {
+            TextureFlavor::Binded { cross, .. } => {
+                self.cmd.list.copy_resource(&texture.raw, cross);
+            }
+            _ => { /* NOOP */ }
+        }
+    }
+
+    fn push_texture(&self, texture: &Self::Texture) {
+        match &texture.flavor {
+            TextureFlavor::Binded { cross, .. } => {
+                self.cmd.list.copy_resource(cross, &texture.raw);
+            }
+            _ => { /* NOOP */ }
+        }
+    }
+}
+
+impl Drop for DxTransferEncoder<'_> {
     fn drop(&mut self) {
         self.cmd.write_timestamp();
     }

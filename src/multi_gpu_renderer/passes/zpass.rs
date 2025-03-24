@@ -14,7 +14,7 @@ use crate::{
         system::RenderSystem,
     },
     rhi::{
-        command::CommandType,
+        command::{CommandType, Subresource},
         resources::{TextureDesc, TextureUsages},
         types::{ClearColor, Format, GeomTopology, IndexType, ResourceState, Scissor, Viewport},
     },
@@ -57,7 +57,11 @@ impl<D: RenderDevice> ZPass<D> {
 
     pub fn render(&self, globals: Handle<ShaderArgument>, frame_idx: usize, world: &World) {
         let mut cmd = self.ctx.create_encoder(CommandType::Graphics);
-        cmd.set_barriers(&[Barrier::Texture(self.depth, ResourceState::DepthWrite)]);
+        cmd.set_barriers(&[Barrier::Texture(
+            self.depth,
+            ResourceState::DepthWrite,
+            Subresource::Local(None),
+        )]);
 
         {
             let mut encoder = cmd.render("Z Prepass".into(), &[], Some(self.depth));

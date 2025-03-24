@@ -13,7 +13,7 @@ use crate::{
         system::RenderSystem,
     },
     rhi::{
-        command::CommandType,
+        command::{CommandType, Subresource},
         types::{GeomTopology, ResourceState, Scissor, Viewport},
     },
 };
@@ -60,7 +60,11 @@ impl<D: RenderDevice> GammaCorrectionPass<D> {
 
     pub fn render(&self, swapchain_view: Handle<Texture>) {
         let mut cmd = self.ctx.create_encoder(CommandType::Graphics);
-        cmd.set_barriers(&[Barrier::Texture(self.accum_srv, ResourceState::Shader)]);
+        cmd.set_barriers(&[Barrier::Texture(
+            self.accum_srv,
+            ResourceState::Shader,
+            Subresource::Local(None),
+        )]);
 
         {
             let mut encoder = cmd.render("Gamma Correction Pass".into(), &[swapchain_view], None);

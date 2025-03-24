@@ -101,8 +101,13 @@ impl<D: RenderDevice> SingleGpuShadows<D> {
         self.gpass.render(globals, frame_idx, world);
 
         debug!("Render Directional Light Pass");
-        self.dir_pass
-            .render(globals, self.csm.srv, self.csm.argument, frame_idx);
+        self.dir_pass.render(
+            globals,
+            self.csm.srv,
+            self.csm.argument,
+            frame_idx,
+            frame_idx,
+        );
 
         debug!("Render Final Pass");
         self.final_pass.render(swapchain_view);
