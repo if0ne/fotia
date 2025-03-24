@@ -84,6 +84,14 @@ impl<D: RenderDevice> RenderCommandQueue for CommandQueue<D> {
     fn wait_idle(&self) {
         self.raw.wait_idle();
     }
+
+    fn is_ready(&self) -> bool {
+        self.raw.is_ready()
+    }
+
+    fn is_ready_for(&self, v: u64) -> bool {
+        self.raw.is_ready_for(v)
+    }
 }
 
 pub struct CommandEncoder<D: RenderDevice> {
@@ -108,6 +116,8 @@ pub trait RenderCommandContext<D: RenderDevice> {
     fn wait_on_cpu(&self, ty: CommandType, value: SyncPoint);
     fn wait_until_complete(&self, ty: CommandType);
     fn wait_idle(&self, ty: CommandType);
+    fn is_ready(&self, ty: CommandType) -> bool;
+    fn is_ready_for(&self, ty: CommandType, v: SyncPoint) -> bool;
 }
 
 impl<D: RenderDevice> RenderCommandContext<D> for Context<D> {
@@ -180,6 +190,22 @@ impl<D: RenderDevice> RenderCommandContext<D> for Context<D> {
             CommandType::Graphics => self.graphics_queue.wait_idle(),
             CommandType::Compute => self.compute_queue.wait_idle(),
             CommandType::Transfer => self.transfer_queue.wait_idle(),
+        }
+    }
+
+    fn is_ready(&self, ty: CommandType) -> bool {
+        match ty {
+            CommandType::Graphics => self.graphics_queue.is_ready(),
+            CommandType::Compute => self.compute_queue.is_ready(),
+            CommandType::Transfer => self.transfer_queue.is_ready(),
+        }
+    }
+
+    fn is_ready_for(&self, ty: CommandType, v: SyncPoint) -> bool {
+        match ty {
+            CommandType::Graphics => self.graphics_queue.is_ready_for(v),
+            CommandType::Compute => self.compute_queue.is_ready_for(v),
+            CommandType::Transfer => self.transfer_queue.is_ready_for(v),
         }
     }
 }

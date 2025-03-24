@@ -39,7 +39,7 @@ pub enum MgpuState {
     WaitForRead(u64),
 }
 
-pub struct CascadedShadowMapsPass<D: RenderDevice> {
+pub struct MultiCascadedShadowMapsPass<D: RenderDevice> {
     pub rs: Arc<RenderSystem>,
     pub group: Arc<ContextDual<D>>,
 
@@ -62,7 +62,7 @@ pub struct CascadedShadowMapsPass<D: RenderDevice> {
     pub pso: Handle<RasterPipeline>,
 }
 
-impl<D: RenderDevice> CascadedShadowMapsPass<D> {
+impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
     pub fn new(
         rs: Arc<RenderSystem>,
         group: Arc<ContextDual<D>>,
