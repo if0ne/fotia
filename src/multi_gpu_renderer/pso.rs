@@ -43,51 +43,6 @@ impl<D: RenderDevice> PsoCollection<D> {
         let g_pass = rs.create_raster_pipeline_handle();
 
         group.parallel(|ctx| {
-            // ZPass
-            let zpass_layout = rs.create_pipeline_layout_handle();
-
-            ctx.bind_pipeline_layout(
-                zpass_layout,
-                PipelineLayoutDesc {
-                    sets: &[
-                        BindingSet {
-                            entries: &[],
-                            use_dynamic_buffer: true,
-                        },
-                        BindingSet {
-                            entries: &[],
-                            use_dynamic_buffer: true,
-                        },
-                    ],
-                    static_samplers: &[],
-                },
-            );
-
-            ctx.bind_raster_pipeline(
-                zpass,
-                RasterPipelineDesc {
-                    layout: Some(zpass_layout),
-                    input_elements: &[InputElementDesc {
-                        semantic: VertexAttribute::Position(0),
-                        format: VertexType::Float3,
-                    }],
-                    depth_bias: 0,
-                    slope_bias: 0.0,
-                    depth_clip: true,
-                    depth: Some(DepthStateDesc {
-                        op: DepthOp::LessEqual,
-                        format: Format::D24S8,
-                        read_only: false,
-                    }),
-                    render_targets: &[],
-                    cull_mode: CullMode::Back,
-                    vs: &shaders.zpass,
-                    shaders: &[],
-                },
-            );
-
-            rs.free_pipeline_layout_handle(zpass_layout);
-
             // CSM Pass
             let csm_layout = rs.create_pipeline_layout_handle();
 
@@ -132,6 +87,53 @@ impl<D: RenderDevice> PsoCollection<D> {
             );
 
             rs.free_pipeline_layout_handle(csm_layout);
+        });
+
+        group.call_primary(|ctx| {
+            // ZPass
+            let zpass_layout = rs.create_pipeline_layout_handle();
+
+            ctx.bind_pipeline_layout(
+                zpass_layout,
+                PipelineLayoutDesc {
+                    sets: &[
+                        BindingSet {
+                            entries: &[],
+                            use_dynamic_buffer: true,
+                        },
+                        BindingSet {
+                            entries: &[],
+                            use_dynamic_buffer: true,
+                        },
+                    ],
+                    static_samplers: &[],
+                },
+            );
+
+            ctx.bind_raster_pipeline(
+                zpass,
+                RasterPipelineDesc {
+                    layout: Some(zpass_layout),
+                    input_elements: &[InputElementDesc {
+                        semantic: VertexAttribute::Position(0),
+                        format: VertexType::Float3,
+                    }],
+                    depth_bias: 0,
+                    slope_bias: 0.0,
+                    depth_clip: true,
+                    depth: Some(DepthStateDesc {
+                        op: DepthOp::LessEqual,
+                        format: Format::D24S8,
+                        read_only: false,
+                    }),
+                    render_targets: &[],
+                    cull_mode: CullMode::Back,
+                    vs: &shaders.zpass,
+                    shaders: &[],
+                },
+            );
+
+            rs.free_pipeline_layout_handle(zpass_layout);
 
             // Directional Light Pass
             let directional_light_layout = rs.create_pipeline_layout_handle();
