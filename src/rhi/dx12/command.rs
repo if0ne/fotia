@@ -338,8 +338,10 @@ impl RenderCommandBuffer for DxCommandBuffer {
                 let label_count = self.allocator.labels.len();
                 let mut timings_map = Vec::with_capacity(label_count);
 
-                let durations = ptr[1..].iter().zip(ptr[2..].iter()).map(|(prev, next)| {
-                    Duration::from_secs_f64((*next - *prev) as f64 / self.frequency)
+                let pass_times = &ptr[1..ptr.len() - 1];
+
+                let durations = pass_times.chunks_exact(2).map(|chunk| {
+                    Duration::from_secs_f64((chunk[1] - chunk[0]) as f64 / self.frequency)
                 });
 
                 timings_map.extend(
