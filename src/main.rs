@@ -192,7 +192,7 @@ impl Application<DxDevice> {
 
         let placeholders = TexturePlaceholders::new(&rs, &group);
 
-        let scene = GltfScene::load("../assets/scenes/pica_pica_-_mini_diorama_01/scene.gltf");
+        let scene = GltfScene::load("../assets/scenes/issum_the_town_on_capital_isle/scene.gltf");
         create_multi_gpu_scene(scene, &mut world, &rs, &group, 3, &placeholders);
 
         Application {
