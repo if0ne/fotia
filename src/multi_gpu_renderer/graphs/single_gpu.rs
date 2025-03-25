@@ -18,6 +18,7 @@ use crate::{
         shader::ShaderArgument,
         system::RenderSystem,
     },
+    settings::RenderSettings,
 };
 
 pub struct SingleGpuShadows<D: RenderDevice> {
@@ -35,7 +36,7 @@ impl<D: RenderDevice> SingleGpuShadows<D> {
         ctx: Arc<Context<D>>,
         extent: [u32; 2],
         psos: &PsoCollection<D>,
-        frames_in_flight: usize,
+        settings: &RenderSettings,
     ) -> Self {
         let zpass = ZPass::new(Arc::clone(&rs), Arc::clone(&ctx), extent, psos);
         let csm = CascadedShadowMapsPass::new(
@@ -43,8 +44,9 @@ impl<D: RenderDevice> SingleGpuShadows<D> {
             Arc::clone(&ctx),
             2048,
             0.5,
+            settings.shadows_far,
             psos,
-            frames_in_flight,
+            settings.frames_in_flight,
         );
 
         let gpass = GPass::new(Arc::clone(&rs), Arc::clone(&ctx), extent, zpass.depth, psos);
@@ -57,7 +59,7 @@ impl<D: RenderDevice> SingleGpuShadows<D> {
             gpass.normal_srv,
             gpass.material_srv,
             gpass.accum,
-            frames_in_flight,
+            settings.frames_in_flight,
             psos,
         );
 

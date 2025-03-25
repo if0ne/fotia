@@ -21,16 +21,18 @@ pub struct Cascade {
 pub struct CascadedShadowMaps {
     pub cascades: Cascades,
     pub lambda: f32,
+    pub shadow_far: Option<f32>,
 }
 
 impl CascadedShadowMaps {
-    pub fn new(lambda: f32) -> Self {
+    pub fn new(lambda: f32, shadow_far: Option<f32>) -> Self {
         Self {
             cascades: Cascades {
                 cascade_proj_views: [glam::Mat4::IDENTITY; 4],
                 distances: [0.0; 4],
             },
             lambda,
+            shadow_far,
         }
     }
 
@@ -38,7 +40,7 @@ impl CascadedShadowMaps {
         let cascade_count = self.cascades.distances.len();
 
         let near_clip = camera.near;
-        let far_clip = camera.far;
+        let far_clip = self.shadow_far.unwrap_or(camera.far);
         let clip_range = far_clip - near_clip;
 
         let min_z = near_clip;

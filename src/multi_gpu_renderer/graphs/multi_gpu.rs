@@ -24,6 +24,7 @@ use crate::{
         command::{CommandType, Subresource},
         types::ResourceState,
     },
+    settings::RenderSettings,
 };
 
 pub struct MultiGpuShadows<D: RenderDevice> {
@@ -41,7 +42,7 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
         ctx: Arc<ContextDual<D>>,
         extent: [u32; 2],
         psos: &PsoCollection<D>,
-        frames_in_flight: usize,
+        settings: &RenderSettings,
     ) -> Self {
         let zpass = ZPass::new(Arc::clone(&rs), Arc::clone(&ctx.primary), extent, psos);
         let csm = MultiCascadedShadowMapsPass::new(
@@ -49,8 +50,9 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
             Arc::clone(&ctx),
             2048,
             0.5,
+            settings.shadows_far,
             psos,
-            frames_in_flight,
+            settings.frames_in_flight,
         );
 
         let gpass = GPass::new(
@@ -69,7 +71,7 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
             gpass.normal_srv,
             gpass.material_srv,
             gpass.accum,
-            frames_in_flight,
+            settings.frames_in_flight,
             psos,
         );
 
