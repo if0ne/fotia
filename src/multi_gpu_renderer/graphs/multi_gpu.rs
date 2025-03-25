@@ -1,18 +1,15 @@
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::Arc;
 
 use hecs::World;
 use tracing::info;
 
 use crate::{
-    collections::handle::Handle,
+    collections::{handle::Handle, rwc_ring_buffer::RwcState},
     engine::camera::Camera,
     multi_gpu_renderer::{
         passes::{
-            directional_light_pass::DirectionalLightPass,
-            gamma_corr_pass::GammaCorrectionPass,
-            gpass::GPass,
-            m_csm::{MgpuState, MultiCascadedShadowMapsPass},
-            zpass::ZPass,
+            directional_light_pass::DirectionalLightPass, gamma_corr_pass::GammaCorrectionPass,
+            gpass::GPass, m_csm::MultiCascadedShadowMapsPass, zpass::ZPass,
         },
         pso::PsoCollection,
     },
@@ -107,13 +104,10 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
         light_dir: glam::Vec3,
         frame_idx: usize,
     ) {
-        let copy_texture = self.csm.copy_texture.load(Ordering::Acquire);
-        let working_texture = self.csm.working_texture.load(Ordering::Acquire);
-
         if self.ctx.secondary.is_ready(CommandType::Graphics)
-            && self.csm.states[working_texture] == MgpuState::WaitForWrite
+            && self.csm.shared.head_state() == RwcState::WaitForWrite
         {
-            self.csm.update(camera, light_dir, working_texture);
+            self.csm.update(camera, light_dir);
 
             self.ctx.call_secondary(|ctx| {
                 let mut cmd = ctx.create_encoder(CommandType::Graphics);
@@ -121,39 +115,40 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
                 info!("Secondary Timings: {:?}", timings);
                 ctx.enqueue(cmd);
 
-                self.csm.render(working_texture, world);
+                self.csm.render(world);
 
                 let mut cmd = ctx.create_encoder(CommandType::Graphics);
 
                 cmd.set_barriers(&[
                     Barrier::Texture(
-                        self.csm.shared[working_texture],
+                        *self.csm.shared.head_data(),
                         ResourceState::CopySrc,
                         Subresource::Local(None),
                     ),
                     Barrier::Texture(
-                        self.csm.shared[working_texture],
+                        *self.csm.shared.head_data(),
                         ResourceState::CopyDst,
                         Subresource::Shared,
                     ),
                 ]);
                 {
                     let encoder = cmd.transfer("Push CSM".into());
-                    encoder.push_texture(self.csm.shared[working_texture]);
+                    encoder.push_texture(*self.csm.shared.head_data());
                 }
 
                 ctx.commit(cmd);
 
-                self.csm.states[working_texture] =
-                    MgpuState::WaitForCopy(ctx.submit(CommandType::Graphics));
+                self.csm
+                    .shared
+                    .update_head_state(RwcState::WaitForCopy(ctx.submit(CommandType::Graphics)));
             });
         }
 
-        if let MgpuState::WaitForCopy(v) = self.csm.states[copy_texture] {
+        if let RwcState::WaitForCopy(v) = self.csm.shared.tail_state() {
             if self.ctx.primary.is_ready(CommandType::Transfer)
                 && self.ctx.secondary.is_ready_for(CommandType::Graphics, v)
             {
-                self.csm.next_working_texture();
+                self.csm.shared.advance_head();
 
                 self.ctx.call_primary(|ctx| {
                     let mut cmd = ctx.create_encoder(CommandType::Transfer);
@@ -162,24 +157,25 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
 
                     cmd.set_barriers(&[
                         Barrier::Texture(
-                            self.csm.shared[copy_texture],
+                            *self.csm.shared.tail_data(),
                             ResourceState::CopyDst,
                             Subresource::Local(None),
                         ),
                         Barrier::Texture(
-                            self.csm.shared[copy_texture],
+                            *self.csm.shared.tail_data(),
                             ResourceState::CopySrc,
                             Subresource::Shared,
                         ),
                     ]);
                     {
                         let encoder = cmd.transfer("Pull CSM".into());
-                        encoder.pull_texture(self.csm.shared[copy_texture]);
+                        encoder.pull_texture(*self.csm.shared.tail_data());
                     }
 
                     ctx.commit(cmd);
-                    self.csm.states[copy_texture] =
-                        MgpuState::WaitForRead(ctx.submit(CommandType::Transfer))
+                    self.csm.shared.update_tail_state(RwcState::WaitForRead(
+                        ctx.submit(CommandType::Transfer),
+                    ));
                 });
             }
         }
@@ -188,33 +184,33 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
 
         self.gpass.render(globals, frame_idx, world);
 
-        let copy_texture = if let MgpuState::WaitForRead(v) = self.csm.states[copy_texture] {
+        let copy_texture = if let RwcState::WaitForRead(v) = self.csm.shared.tail_state() {
             if self.ctx.primary.is_ready_for(CommandType::Transfer, v) {
-                self.csm.next_copy_texture();
-                self.csm.states[copy_texture] = MgpuState::WaitForWrite;
-                copy_texture
+                self.csm.shared.update_tail_state(RwcState::WaitForWrite);
+                let csm = *self.csm.shared.tail_data();
+                Some(csm)
             } else {
-                if copy_texture == 0 {
-                    self.csm.frames_in_flight - 1
-                } else {
-                    copy_texture - 1
-                }
+                None
             }
         } else {
-            if copy_texture == 0 {
-                self.csm.frames_in_flight - 1
-            } else {
-                copy_texture - 1
+            None
+        };
+
+        let (csm, idx) = match copy_texture {
+            Some(texture) => {
+                let idx = self.csm.shared.tail;
+                self.csm.shared.advance_tail();
+                (texture, idx)
+            }
+            None => {
+                let idx = self.csm.shared.tip_index();
+                let texture = *self.csm.shared.tip_data();
+                (texture, idx)
             }
         };
 
-        self.dir_pass.render(
-            globals,
-            self.csm.shared[copy_texture],
-            self.csm.argument[copy_texture],
-            frame_idx,
-            copy_texture,
-        );
+        self.dir_pass
+            .render(globals, csm, self.csm.argument[idx], frame_idx, idx);
 
         self.final_pass.render(swapchain_view);
     }

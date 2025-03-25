@@ -1,7 +1,7 @@
 use parking_lot::Mutex;
 
 use crate::{
-    collections::{handle::Handle, sparse_array::SparseArray},
+    collections::{handle::Handle, sparse_map::SparseMap},
     rhi::{
         command::{IoCommandBuffer, RenderCommandQueue},
         resources::{Buffer as _, BufferDesc, SamplerDesc, TextureDesc, TextureViewDesc},
@@ -159,24 +159,24 @@ impl<D: RenderDevice> RenderResourceContext for Context<D> {
 }
 
 pub(super) struct ResourceMapper<D: RenderDevice> {
-    pub(super) buffers: Mutex<SparseArray<Buffer, D::Buffer>>,
-    pub(super) textures: Mutex<SparseArray<Texture, D::Texture>>,
-    pub(super) samplers: Mutex<SparseArray<Sampler, D::Sampler>>,
+    pub(super) buffers: Mutex<SparseMap<Buffer, D::Buffer>>,
+    pub(super) textures: Mutex<SparseMap<Texture, D::Texture>>,
+    pub(super) samplers: Mutex<SparseMap<Sampler, D::Sampler>>,
 
-    pub(super) pipeline_layouts: Mutex<SparseArray<PipelineLayout, D::PipelineLayout>>,
-    pub(super) shader_arguments: Mutex<SparseArray<ShaderArgument, D::ShaderArgument>>,
-    pub(super) raster_pipelines: Mutex<SparseArray<RasterPipeline, D::RasterPipeline>>,
+    pub(super) pipeline_layouts: Mutex<SparseMap<PipelineLayout, D::PipelineLayout>>,
+    pub(super) shader_arguments: Mutex<SparseMap<ShaderArgument, D::ShaderArgument>>,
+    pub(super) raster_pipelines: Mutex<SparseMap<RasterPipeline, D::RasterPipeline>>,
 }
 
 impl<D: RenderDevice> Default for ResourceMapper<D> {
     fn default() -> Self {
         Self {
-            buffers: Mutex::new(SparseArray::new(128)),
-            textures: Mutex::new(SparseArray::new(128)),
-            samplers: Mutex::new(SparseArray::new(128)),
-            pipeline_layouts: Mutex::new(SparseArray::new(128)),
-            shader_arguments: Mutex::new(SparseArray::new(1024)),
-            raster_pipelines: Mutex::new(SparseArray::new(128)),
+            buffers: Mutex::new(SparseMap::new(128)),
+            textures: Mutex::new(SparseMap::new(128)),
+            samplers: Mutex::new(SparseMap::new(128)),
+            pipeline_layouts: Mutex::new(SparseMap::new(128)),
+            shader_arguments: Mutex::new(SparseMap::new(1024)),
+            raster_pipelines: Mutex::new(SparseMap::new(128)),
         }
     }
 }
