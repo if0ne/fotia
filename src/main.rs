@@ -1,3 +1,12 @@
+pub mod collections;
+pub mod engine;
+pub mod ra;
+pub mod rhi;
+pub mod timer;
+
+mod multi_gpu_renderer;
+mod settings;
+
 use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 use collections::handle::Handle;
@@ -29,6 +38,7 @@ use rhi::{
     swapchain::{PresentMode, SwapchainDesc},
     types::ResourceState,
 };
+use settings::{RenderSettings, read_settings};
 use timer::GameTimer;
 use tracing::info;
 use tracing_subscriber::layer::SubscriberExt;
@@ -36,14 +46,6 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     raw_window_handle::{HasWindowHandle, RawWindowHandle},
 };
-
-pub mod collections;
-pub mod engine;
-pub mod ra;
-pub mod rhi;
-pub mod timer;
-
-mod multi_gpu_renderer;
 
 pub struct WindowContext<D: RenderDevice> {
     pub window: winit::window::Window,
@@ -112,12 +114,14 @@ fn main() {
     let event_loop = winit::event_loop::EventLoop::new().expect("failed to create event loop");
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
-    let mut app = Application::new(800, 600);
+    let settings = read_settings();
+
+    let mut app = Application::new(settings);
     event_loop.run_app(&mut app).expect("failed to run app");
 }
 
 impl Application<DxDevice> {
-    fn new(width: u32, height: u32) -> Application<DxDevice> {
+    fn new(settings: RenderSettings) -> Application<DxDevice> {
         let rs = Arc::new(RenderSystem::new(&[RenderBackendSettings {
             api: RenderBackend::Dx12,
             debug: if cfg!(debug_assertions) {
@@ -141,17 +145,17 @@ impl Application<DxDevice> {
         let single_gpu = SingleGpuShadows::new(
             Arc::clone(&rs),
             Arc::clone(&group.primary),
-            [width, height],
+            [settings.width, settings.height],
             &psos,
-            3,
+            &settings,
         );
 
         let multi_gpu = MultiGpuShadows::new(
             Arc::clone(&rs),
             Arc::clone(&group),
-            [width, height],
+            [settings.width, settings.height],
             &psos,
-            3,
+            &settings,
         );
 
         let mut world = World::new();
@@ -159,10 +163,10 @@ impl Application<DxDevice> {
         let fps_controller = FpsController::new(0.003, 100.0);
 
         let camera = Camera {
-            far: 1000.0,
+            far: settings.camera_far,
             near: 0.1,
             fov: 90.0f32.to_radians(),
-            aspect_ratio: width as f32 / height as f32,
+            aspect_ratio: settings.width as f32 / settings.height as f32,
             view: glam::Mat4::IDENTITY,
         };
 
@@ -173,7 +177,7 @@ impl Application<DxDevice> {
             ctx.bind_buffer(
                 buffer,
                 rhi::resources::BufferDesc::cpu_to_gpu(
-                    size_of::<GpuGlobals>() * 3,
+                    size_of::<GpuGlobals>() * settings.frames_in_flight,
                     BufferUsages::Uniform,
                 )
                 .with_name("Global data".into()),
@@ -192,13 +196,20 @@ impl Application<DxDevice> {
 
         let placeholders = TexturePlaceholders::new(&rs, &group);
 
-        let scene = GltfScene::load("../assets/scenes/issum_the_town_on_capital_isle/scene.gltf");
-        create_multi_gpu_scene(scene, &mut world, &rs, &group, 3, &placeholders);
+        let scene = GltfScene::load(&settings.scene_path);
+        create_multi_gpu_scene(
+            scene,
+            &mut world,
+            &rs,
+            &group,
+            settings.frames_in_flight,
+            &placeholders,
+        );
 
         Application {
             title: format!("Fotia Render Mode: {:?}", RenderMode::SingleGpu),
-            width,
-            height,
+            width: settings.width,
+            height: settings.height,
 
             timer: GameTimer::default(),
 
@@ -213,7 +224,7 @@ impl Application<DxDevice> {
             render_mode: RenderMode::SingleGpu,
 
             world,
-            frames_in_flight: 3,
+            frames_in_flight: settings.frames_in_flight,
             frame_idx: 0,
             camera,
             fps_controller,

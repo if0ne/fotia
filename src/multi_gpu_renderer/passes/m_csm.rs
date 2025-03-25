@@ -53,6 +53,7 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
         group: Arc<ContextDual<D>>,
         size: u32,
         lambda: f32,
+        shadow_far: Option<f32>,
         psos: &PsoCollection<D>,
         frames_in_flight: usize,
     ) -> Self {
@@ -146,7 +147,7 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
             rs,
             group,
             size,
-            csm: CascadedShadowMaps::new(lambda),
+            csm: CascadedShadowMaps::new(lambda, shadow_far),
             gpu_csm_buffer,
             argument,
             gpu_csm_proj_view_buffer,

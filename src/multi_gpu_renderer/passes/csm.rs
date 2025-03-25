@@ -53,6 +53,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
         ctx: Arc<Context<D>>,
         size: u32,
         lambda: f32,
+        shadow_far: Option<f32>,
         psos: &PsoCollection<D>,
         frames_in_flight: usize,
     ) -> Self {
@@ -126,7 +127,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
             rs,
             ctx,
             size,
-            csm: CascadedShadowMaps::new(lambda),
+            csm: CascadedShadowMaps::new(lambda, shadow_far),
             gpu_csm_buffer,
             argument,
             gpu_csm_proj_view_buffer,
