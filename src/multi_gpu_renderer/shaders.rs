@@ -45,7 +45,10 @@ impl ShaderCollection {
             path: settings.asset_path.join("DirectionalLight.hlsl"),
             entry_point: "Main".into(),
             debug,
-            defines: vec![],
+            defines: vec![(
+                "CASCADES_COUNT".into(),
+                settings.cascades_count.to_string().into(),
+            )],
         });
 
         let gamma_corr_pass = api.compile_shader(&ShaderDesc {

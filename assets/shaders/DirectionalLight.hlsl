@@ -4,6 +4,10 @@
 #include "Pbr.hlsl"
 #include "FullscreenVS.hlsl"
 
+#ifndef CASCADES_COUNT
+#define CASCADES_COUNT 4
+#endif
+
 SamplerComparisonState comp_shadow_s : register(s0, space0);
 
 cbuffer GlobalBuffer : register(b0, space0) {
@@ -52,7 +56,7 @@ float4 Main(FullscreenVertex input) : SV_Target {
     float fragment_dist = mul(g_data.view, world_pos).z;
     uint cascade_idx = 0;
 
-     for (uint i = 0; i < 4 - 1; ++i)
+     for (uint i = 0; i < CASCADES_COUNT - 1; ++i)
     {
         if (fragment_dist > csm_data.split_distances[i])
         {

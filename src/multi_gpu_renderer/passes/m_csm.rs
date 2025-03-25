@@ -173,10 +173,10 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
         });
 
         self.group.call_secondary(|ctx| {
-            for i in 0..4 {
+            for i in 0..self.count {
                 ctx.update_buffer(
                     self.gpu_csm_proj_view_buffer,
-                    4 * self.shared.head + i,
+                    self.count * self.shared.head + i,
                     &[Cascade {
                         proj_view: self.csm.cascades.cascade_proj_views[i],
                     }],
@@ -211,7 +211,8 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
                     h: self.size * 2,
                 });
 
-                for i in 0..4 {
+                for i in 0..self.count {
+                    let i = i as u32;
                     let row = i / 2;
                     let col = i % 2;
                     encoder.set_viewport(Viewport {
@@ -224,7 +225,7 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
                     encoder.bind_shader_argument(
                         0,
                         self.local_argument,
-                        size_of::<Cascade>() * (self.shared.head * 4 + i as usize),
+                        size_of::<Cascade>() * (self.shared.head * self.count + i as usize),
                     );
 
                     for (_, (transform, mesh)) in world
