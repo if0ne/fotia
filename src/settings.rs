@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Parser)]
 #[command(version, about, long_about = None)]
 pub struct CliRenderSettings {
-    #[arg(short, long)]
+    #[arg(long)]
     pub width: Option<u32>,
 
-    #[arg(short, long)]
+    #[arg(long)]
     pub height: Option<u32>,
 
     #[arg(long)]
@@ -18,13 +18,16 @@ pub struct CliRenderSettings {
     #[arg(long)]
     pub cascade_size: Option<u32>,
 
-    #[arg(short, long)]
+    #[arg(long)]
     pub scene_path: Option<String>,
 
-    #[arg(short, long)]
+    #[arg(long)]
+    pub asset_path: Option<String>,
+
+    #[arg(long)]
     pub scene_scale: Option<f32>,
 
-    #[arg(short, long)]
+    #[arg(long)]
     pub bench_addr: Option<String>,
 
     #[arg(long)]
@@ -35,6 +38,9 @@ pub struct CliRenderSettings {
 
     #[arg(long)]
     pub shadows_far: Option<f32>,
+
+    #[arg(long)]
+    pub cascades_lambda: Option<f32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -53,6 +59,8 @@ pub struct TomlRenderSettings {
 
     pub scene_path: Option<String>,
 
+    pub asset_path: Option<String>,
+
     #[serde(default = "default_scene_scale")]
     pub scene_scale: f32,
 
@@ -65,6 +73,9 @@ pub struct TomlRenderSettings {
     pub camera_far: f32,
 
     pub shadows_far: Option<f32>,
+
+    #[serde(default = "default_cascades_lambda")]
+    pub cascades_lambda: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -74,11 +85,13 @@ pub struct RenderSettings {
     pub cascades_count: usize,
     pub cascade_size: u32,
     pub scene_path: PathBuf,
+    pub asset_path: PathBuf,
     pub scene_scale: f32,
     pub bench_addr: Option<String>,
     pub frames_in_flight: usize,
     pub camera_far: f32,
     pub shadows_far: Option<f32>,
+    pub cascades_lambda: f32,
 }
 
 pub fn read_settings() -> RenderSettings {
@@ -96,6 +109,7 @@ pub fn read_settings() -> RenderSettings {
         cascades_count: cli.cascades_count.unwrap_or_else(default_cascades_count),
         cascade_size: cli.cascade_size.unwrap_or_else(default_cascade_size),
         scene_path: cli.scene_path.expect("failed to get scene path").into(),
+        asset_path: cli.asset_path.expect("failed to get asset path").into(),
         scene_scale: cli.scene_scale.unwrap_or_else(default_scene_scale),
         bench_addr: cli.bench_addr,
         frames_in_flight: cli
@@ -103,6 +117,7 @@ pub fn read_settings() -> RenderSettings {
             .unwrap_or_else(default_frames_in_flight),
         camera_far: cli.camera_far.unwrap_or_else(default_camera_far),
         shadows_far: cli.shadows_far,
+        cascades_lambda: cli.cascades_lambda.unwrap_or_else(default_cascades_lambda),
     }
 }
 
@@ -111,17 +126,23 @@ pub fn merge_settings(cli: CliRenderSettings, toml: TomlRenderSettings) -> Rende
         width: cli.width.unwrap_or(toml.width),
         height: cli.height.unwrap_or(toml.height),
         cascades_count: cli.cascades_count.unwrap_or(toml.cascades_count),
-        cascade_size: cli.width.unwrap_or(toml.width),
+        cascade_size: cli.cascade_size.unwrap_or(toml.cascade_size),
         scene_path: cli
             .scene_path
             .or(toml.scene_path)
             .expect("failed to get scene path")
+            .into(),
+        asset_path: cli
+            .asset_path
+            .or(toml.asset_path)
+            .expect("failed to get asset path")
             .into(),
         scene_scale: cli.scene_scale.unwrap_or(toml.scene_scale),
         bench_addr: cli.bench_addr.or(toml.bench_addr),
         frames_in_flight: cli.frames_in_flight.unwrap_or(toml.frames_in_flight),
         camera_far: cli.camera_far.unwrap_or(toml.camera_far),
         shadows_far: cli.shadows_far.or(toml.shadows_far),
+        cascades_lambda: cli.cascades_lambda.unwrap_or(toml.cascades_lambda),
     }
 }
 
@@ -134,7 +155,7 @@ fn default_height() -> u32 {
 }
 
 fn default_frames_in_flight() -> usize {
-    600
+    3
 }
 
 fn default_scene_scale() -> f32 {
@@ -151,4 +172,8 @@ fn default_cascade_size() -> u32 {
 
 fn default_camera_far() -> f32 {
     1000.0
+}
+
+fn default_cascades_lambda() -> f32 {
+    0.5
 }

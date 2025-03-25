@@ -13,7 +13,7 @@ image = "0.25.5"
 bevy_mikktspace = "0.15.3"
 parking_lot = "0.12.3"
 range-alloc = "0.1.4"
-smallvec = "1.14.0"
+smallvec = { version = "1.14.0", features = ["const_generics"] }
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 winit = "0.30.9"

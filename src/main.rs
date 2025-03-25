@@ -133,7 +133,7 @@ impl Application<DxDevice> {
 
         let backend = rs.dx_backend().expect("failed to get directx backend");
 
-        let shaders = ShaderCollection::new(&backend, cfg!(debug_assertions));
+        let shaders = ShaderCollection::new(&backend, cfg!(debug_assertions), &settings);
 
         let primary = backend.create_device(0);
         let secondary = backend.create_device(1);
@@ -197,14 +197,7 @@ impl Application<DxDevice> {
         let placeholders = TexturePlaceholders::new(&rs, &group);
 
         let scene = GltfScene::load(&settings.scene_path);
-        create_multi_gpu_scene(
-            scene,
-            &mut world,
-            &rs,
-            &group,
-            settings.frames_in_flight,
-            &placeholders,
-        );
+        create_multi_gpu_scene(scene, &mut world, &rs, &group, &settings, &placeholders);
 
         Application {
             title: format!("Fotia Render Mode: {:?}", RenderMode::SingleGpu),

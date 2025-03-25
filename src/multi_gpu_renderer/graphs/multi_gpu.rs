@@ -45,15 +45,8 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
         settings: &RenderSettings,
     ) -> Self {
         let zpass = ZPass::new(Arc::clone(&rs), Arc::clone(&ctx.primary), extent, psos);
-        let csm = MultiCascadedShadowMapsPass::new(
-            Arc::clone(&rs),
-            Arc::clone(&ctx),
-            2048,
-            0.5,
-            settings.shadows_far,
-            psos,
-            settings.frames_in_flight,
-        );
+        let csm =
+            MultiCascadedShadowMapsPass::new(Arc::clone(&rs), Arc::clone(&ctx), settings, psos);
 
         let gpass = GPass::new(
             Arc::clone(&rs),

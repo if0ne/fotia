@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use crate::{
     ra::{backend::Backend, context::RenderDevice},
     rhi::{
@@ -7,6 +5,7 @@ use crate::{
         shader::{CompiledShader, ShaderDesc},
         types::ShaderType,
     },
+    settings::RenderSettings,
 };
 
 pub struct ShaderCollection {
@@ -20,12 +19,14 @@ pub struct ShaderCollection {
 }
 
 impl ShaderCollection {
-    pub fn new<A: Api<Device: RenderDevice>>(api: &Backend<A>, debug: bool) -> Self {
-        let asset_path = PathBuf::from("../assets/shaders");
-
+    pub fn new<A: Api<Device: RenderDevice>>(
+        api: &Backend<A>,
+        debug: bool,
+        settings: &RenderSettings,
+    ) -> Self {
         let csm = api.compile_shader(&ShaderDesc {
             ty: ShaderType::Vertex,
-            path: asset_path.join("Csm.hlsl"),
+            path: settings.asset_path.join("Csm.hlsl"),
             entry_point: "Main".into(),
             debug,
             defines: vec![],
@@ -33,7 +34,7 @@ impl ShaderCollection {
 
         let fullscreen = api.compile_shader(&ShaderDesc {
             ty: ShaderType::Vertex,
-            path: asset_path.join("FullscreenVS.hlsl"),
+            path: settings.asset_path.join("FullscreenVS.hlsl"),
             entry_point: "Main".into(),
             debug,
             defines: vec![],
@@ -41,7 +42,7 @@ impl ShaderCollection {
 
         let directional_light_pass = api.compile_shader(&ShaderDesc {
             ty: ShaderType::Pixel,
-            path: asset_path.join("DirectionalLight.hlsl"),
+            path: settings.asset_path.join("DirectionalLight.hlsl"),
             entry_point: "Main".into(),
             debug,
             defines: vec![],
@@ -49,7 +50,7 @@ impl ShaderCollection {
 
         let gamma_corr_pass = api.compile_shader(&ShaderDesc {
             ty: ShaderType::Pixel,
-            path: asset_path.join("GammaCorr.hlsl"),
+            path: settings.asset_path.join("GammaCorr.hlsl"),
             entry_point: "Main".into(),
             debug,
             defines: vec![],
@@ -57,7 +58,7 @@ impl ShaderCollection {
 
         let zpass = api.compile_shader(&ShaderDesc {
             ty: ShaderType::Vertex,
-            path: asset_path.join("Zpass.hlsl"),
+            path: settings.asset_path.join("Zpass.hlsl"),
             entry_point: "Main".into(),
             debug,
             defines: vec![],
@@ -65,7 +66,7 @@ impl ShaderCollection {
 
         let gpass_vs = api.compile_shader(&ShaderDesc {
             ty: ShaderType::Vertex,
-            path: asset_path.join("GPass.hlsl"),
+            path: settings.asset_path.join("GPass.hlsl"),
             entry_point: "VSMain".into(),
             debug,
             defines: vec![],
@@ -73,7 +74,7 @@ impl ShaderCollection {
 
         let gpass_ps = api.compile_shader(&ShaderDesc {
             ty: ShaderType::Pixel,
-            path: asset_path.join("GPass.hlsl"),
+            path: settings.asset_path.join("GPass.hlsl"),
             entry_point: "PSMain".into(),
             debug,
             defines: vec![],

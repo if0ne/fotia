@@ -48,7 +48,7 @@ impl<T, const N: usize> RwcRingBuffer<T, N> {
 
     #[inline]
     pub fn advance_tail(&mut self) {
-        self.tail = (self.tail + 1) % self.tail;
+        self.tail = (self.tail + 1) % self.size;
     }
 
     #[inline]
