@@ -17,6 +17,7 @@ use crate::{
         resources::{BufferDesc, BufferUsages, MemoryLocation, TextureDesc, TextureUsages},
         types::Format,
     },
+    settings::RenderSettings,
 };
 
 pub mod csm;
@@ -78,7 +79,7 @@ pub fn create_multi_gpu_scene<D: RenderDevice>(
     world: &mut World,
     rs: &RenderSystem,
     group: &ContextDual<D>,
-    frames_in_flight: usize,
+    settings: &RenderSettings,
     dummy: &TexturePlaceholders,
 ) {
     let prepared = scene.prepare(rs);
@@ -109,9 +110,13 @@ pub fn create_multi_gpu_scene<D: RenderDevice>(
         );
 
         for (buffer, argument) in prepared.submeshes.iter() {
-            let data = (0..frames_in_flight)
+            let data = (0..settings.frames_in_flight)
                 .map(|_| GpuTransform {
-                    mat: glam::Mat4::from_scale(vec3(25.0, 25.0, 25.0)),
+                    mat: glam::Mat4::from_scale(vec3(
+                        settings.scene_scale,
+                        settings.scene_scale,
+                        settings.scene_scale,
+                    )),
                 })
                 .collect::<Vec<_>>();
 
@@ -119,7 +124,7 @@ pub fn create_multi_gpu_scene<D: RenderDevice>(
                 *buffer,
                 BufferDesc {
                     name: Some("Object Position".into()),
-                    size: frames_in_flight * size_of::<GpuTransform>(),
+                    size: settings.frames_in_flight * size_of::<GpuTransform>(),
                     stride: 0,
                     usage: BufferUsages::Uniform,
                     memory_location: MemoryLocation::CpuToGpu,

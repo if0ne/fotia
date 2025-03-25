@@ -39,15 +39,7 @@ impl<D: RenderDevice> SingleGpuShadows<D> {
         settings: &RenderSettings,
     ) -> Self {
         let zpass = ZPass::new(Arc::clone(&rs), Arc::clone(&ctx), extent, psos);
-        let csm = CascadedShadowMapsPass::new(
-            Arc::clone(&rs),
-            Arc::clone(&ctx),
-            2048,
-            0.5,
-            settings.shadows_far,
-            psos,
-            settings.frames_in_flight,
-        );
+        let csm = CascadedShadowMapsPass::new(Arc::clone(&rs), Arc::clone(&ctx), settings, psos);
 
         let gpass = GPass::new(Arc::clone(&rs), Arc::clone(&ctx), extent, zpass.depth, psos);
 

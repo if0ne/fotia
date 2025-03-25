@@ -25,6 +25,7 @@ use crate::{
         },
         types::{ClearColor, Format, GeomTopology, IndexType, ResourceState, Scissor, Viewport},
     },
+    settings::RenderSettings,
 };
 
 pub struct CascadedShadowMapsPass<D: RenderDevice> {
@@ -32,6 +33,7 @@ pub struct CascadedShadowMapsPass<D: RenderDevice> {
     pub ctx: Arc<Context<D>>,
 
     pub size: u32,
+    pub count: usize,
 
     pub csm: CascadedShadowMaps,
 
@@ -51,11 +53,8 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
     pub fn new(
         rs: Arc<RenderSystem>,
         ctx: Arc<Context<D>>,
-        size: u32,
-        lambda: f32,
-        shadow_far: Option<f32>,
+        settings: &RenderSettings,
         psos: &PsoCollection<D>,
-        frames_in_flight: usize,
     ) -> Self {
         let dsv = rs.create_texture_handle();
         let srv = rs.create_texture_handle();
@@ -69,7 +68,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
         ctx.bind_texture(
             dsv,
             TextureDesc::new_2d(
-                [2 * size, 2 * size],
+                [2 * settings.cascade_size, 2 * settings.cascade_size],
                 Format::D32,
                 TextureUsages::DepthTarget | TextureUsages::Resource,
             )
@@ -88,7 +87,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
         ctx.bind_buffer(
             gpu_csm_buffer,
             BufferDesc::cpu_to_gpu(
-                size_of::<Cascades>() * frames_in_flight,
+                size_of::<Cascades>() * settings.frames_in_flight,
                 BufferUsages::Uniform,
             )
             .with_name("CSM Buffer".into()),
@@ -98,7 +97,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
         ctx.bind_buffer(
             gpu_csm_proj_view_buffer,
             BufferDesc::cpu_to_gpu(
-                size_of::<Cascade>() * frames_in_flight * 4,
+                size_of::<Cascade>() * settings.frames_in_flight * settings.cascades_count,
                 BufferUsages::Uniform,
             )
             .with_name("CSM Proj View Buffer".into()),
@@ -126,8 +125,13 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
         Self {
             rs,
             ctx,
-            size,
-            csm: CascadedShadowMaps::new(lambda, shadow_far),
+            size: settings.cascade_size,
+            count: settings.cascades_count,
+            csm: CascadedShadowMaps::new(
+                settings.cascades_lambda,
+                settings.shadows_far,
+                settings.cascades_count,
+            ),
             gpu_csm_buffer,
             argument,
             gpu_csm_proj_view_buffer,
@@ -147,10 +151,10 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
             &[self.csm.cascades.clone()],
         );
 
-        for i in 0..4 {
+        for i in 0..self.count {
             self.ctx.update_buffer(
                 self.gpu_csm_proj_view_buffer,
-                4 * frame_index + i,
+                self.count * frame_index + i,
                 &[Cascade {
                     proj_view: self.csm.cascades.cascade_proj_views[i],
                 }],
@@ -179,7 +183,9 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
                 h: self.size * 2,
             });
 
-            for i in 0..4 {
+            for i in 0..self.count {
+                let i = i as u32;
+
                 let row = i / 2;
                 let col = i % 2;
                 encoder.set_viewport(Viewport {
@@ -192,7 +198,7 @@ impl<D: RenderDevice> CascadedShadowMapsPass<D> {
                 encoder.bind_shader_argument(
                     0,
                     self.local_argument,
-                    size_of::<Cascade>() * (frame_idx * 4 + i as usize),
+                    size_of::<Cascade>() * (frame_idx * self.count + i as usize),
                 );
 
                 for (_, (transform, mesh)) in world

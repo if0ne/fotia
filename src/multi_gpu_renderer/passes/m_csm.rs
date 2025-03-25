@@ -26,6 +26,7 @@ use crate::{
         },
         types::{ClearColor, Format, GeomTopology, IndexType, ResourceState, Scissor, Viewport},
     },
+    settings::RenderSettings,
 };
 
 pub struct MultiCascadedShadowMapsPass<D: RenderDevice> {
@@ -33,6 +34,7 @@ pub struct MultiCascadedShadowMapsPass<D: RenderDevice> {
     pub group: Arc<ContextDual<D>>,
 
     pub size: u32,
+    pub count: usize,
 
     pub csm: CascadedShadowMaps,
 
@@ -51,13 +53,10 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
     pub fn new(
         rs: Arc<RenderSystem>,
         group: Arc<ContextDual<D>>,
-        size: u32,
-        lambda: f32,
-        shadow_far: Option<f32>,
+        settings: &RenderSettings,
         psos: &PsoCollection<D>,
-        frames_in_flight: usize,
     ) -> Self {
-        let texture_count = frames_in_flight.min(3);
+        let texture_count = settings.frames_in_flight.min(3);
 
         let shared = (0..texture_count)
             .map(|_| rs.create_texture_handle())
@@ -76,7 +75,7 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
                 ctx.bind_texture(
                     *t,
                     TextureDesc::new_2d(
-                        [2 * size, 2 * size],
+                        [2 * settings.cascade_size, 2 * settings.cascade_size],
                         Format::D32,
                         TextureUsages::DepthTarget
                             | TextureUsages::Resource
@@ -91,7 +90,7 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
             ctx.bind_buffer(
                 gpu_csm_proj_view_buffer,
                 BufferDesc::cpu_to_gpu(
-                    size_of::<Cascade>() * texture_count * 4,
+                    size_of::<Cascade>() * texture_count * settings.cascades_count,
                     BufferUsages::Uniform,
                 )
                 .with_name("CSM Proj View Buffer".into()),
@@ -146,8 +145,13 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
         Self {
             rs,
             group,
-            size,
-            csm: CascadedShadowMaps::new(lambda, shadow_far),
+            size: settings.cascade_size,
+            count: settings.cascades_count,
+            csm: CascadedShadowMaps::new(
+                settings.cascades_lambda,
+                settings.shadows_far,
+                settings.cascades_count,
+            ),
             gpu_csm_buffer,
             argument,
             gpu_csm_proj_view_buffer,

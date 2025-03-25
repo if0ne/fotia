@@ -1,0 +1,4 @@
+scene_path = "./assets/scenes/pica_pica_-_mini_diorama_01/scene.gltf"
+asset_path = "./assets/shaders"
+scene_scale = 10.0
+shadows_far = 500.0

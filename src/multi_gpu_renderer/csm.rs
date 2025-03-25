@@ -2,12 +2,14 @@ use glam::Vec4Swizzles;
 
 use crate::engine::camera::Camera;
 
+const CASCADES_MAX: usize = 4;
+
 #[repr(C)]
 #[repr(align(256))]
 #[derive(Clone, Debug)]
 pub struct Cascades {
-    pub cascade_proj_views: [glam::Mat4; 4],
-    pub distances: [f32; 4],
+    pub cascade_proj_views: [glam::Mat4; CASCADES_MAX],
+    pub distances: [f32; CASCADES_MAX],
 }
 
 #[repr(C)]
@@ -22,17 +24,19 @@ pub struct CascadedShadowMaps {
     pub cascades: Cascades,
     pub lambda: f32,
     pub shadow_far: Option<f32>,
+    pub count: usize,
 }
 
 impl CascadedShadowMaps {
-    pub fn new(lambda: f32, shadow_far: Option<f32>) -> Self {
+    pub fn new(lambda: f32, shadow_far: Option<f32>, count: usize) -> Self {
         Self {
             cascades: Cascades {
-                cascade_proj_views: [glam::Mat4::IDENTITY; 4],
+                cascade_proj_views: [glam::Mat4::IDENTITY; CASCADES_MAX],
                 distances: [0.0; 4],
             },
             lambda,
             shadow_far,
+            count,
         }
     }
 
@@ -49,7 +53,13 @@ impl CascadedShadowMaps {
         let range = max_z - min_z;
         let ratio: f32 = max_z / min_z;
 
-        for (i, distance) in self.cascades.distances.iter_mut().enumerate() {
+        for (i, distance) in self
+            .cascades
+            .distances
+            .iter_mut()
+            .take(self.count)
+            .enumerate()
+        {
             let p = (i as f32 + 1.0) / cascade_count as f32;
             let log = min_z * ratio.powf(p);
             let uniform = min_z + range * p;
