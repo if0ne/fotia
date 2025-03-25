@@ -1,13 +1,10 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
-};
+use std::sync::Arc;
 
 use hecs::World;
 use smallvec::SmallVec;
 
 use crate::{
-    collections::handle::Handle,
+    collections::{handle::Handle, rwc_ring_buffer::RwcRingBuffer},
     engine::{GpuMeshComponent, GpuTransform, GpuTransformComponent, camera::Camera},
     multi_gpu_renderer::{
         csm::{Cascade, CascadedShadowMaps, Cascades},
@@ -31,14 +28,6 @@ use crate::{
     },
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum MgpuState {
-    #[default]
-    WaitForWrite,
-    WaitForCopy(u64),
-    WaitForRead(u64),
-}
-
 pub struct MultiCascadedShadowMapsPass<D: RenderDevice> {
     pub rs: Arc<RenderSystem>,
     pub group: Arc<ContextDual<D>>,
@@ -53,11 +42,7 @@ pub struct MultiCascadedShadowMapsPass<D: RenderDevice> {
     pub gpu_csm_proj_view_buffer: Handle<Buffer>,
     pub local_argument: Handle<ShaderArgument>,
 
-    pub shared: SmallVec<[Handle<Texture>; 4]>,
-    pub working_texture: AtomicUsize,
-    pub copy_texture: AtomicUsize,
-    pub states: SmallVec<[MgpuState; 4]>,
-    pub frames_in_flight: usize,
+    pub shared: RwcRingBuffer<Handle<Texture>, 4>,
 
     pub pso: Handle<RasterPipeline>,
 }
@@ -167,21 +152,17 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
             gpu_csm_proj_view_buffer,
             local_argument,
             pso: psos.csm_pass,
-            shared,
-            working_texture: Default::default(),
-            copy_texture: Default::default(),
-            states: (0..frames_in_flight).map(|_| Default::default()).collect(),
-            frames_in_flight,
+            shared: RwcRingBuffer::new(shared),
         }
     }
 
-    pub fn update(&mut self, camera: &Camera, light_dir: glam::Vec3, frame_index: usize) {
+    pub fn update(&mut self, camera: &Camera, light_dir: glam::Vec3) {
         self.csm.update(camera, light_dir);
 
         self.group.call_primary(|ctx| {
             ctx.update_buffer(
                 self.gpu_csm_buffer,
-                frame_index,
+                self.shared.head,
                 &[self.csm.cascades.clone()],
             );
         });
@@ -190,7 +171,7 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
             for i in 0..4 {
                 ctx.update_buffer(
                     self.gpu_csm_proj_view_buffer,
-                    4 * frame_index + i,
+                    4 * self.shared.head + i,
                     &[Cascade {
                         proj_view: self.csm.cascades.cascade_proj_views[i],
                     }],
@@ -199,11 +180,11 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
         });
     }
 
-    pub fn render(&self, frame_idx: usize, world: &World) {
+    pub fn render(&self, world: &World) {
         self.group.call_secondary(|ctx| {
             let mut cmd = ctx.create_encoder(CommandType::Graphics);
             cmd.set_barriers(&[Barrier::Texture(
-                self.shared[frame_idx],
+                *self.shared.head_data(),
                 ResourceState::DepthWrite,
                 Subresource::Local(None),
             )]);
@@ -212,10 +193,10 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
                 let mut encoder = cmd.render(
                     "Cascaded Shadow Maps".into(),
                     &[],
-                    Some(self.shared[frame_idx]),
+                    Some(*self.shared.head_data()),
                 );
                 encoder.set_render_pipeline(self.pso);
-                encoder.clear_depth(self.shared[frame_idx], None);
+                encoder.clear_depth(*self.shared.head_data(), None);
                 encoder.set_topology(GeomTopology::Triangles);
 
                 encoder.set_scissor(Scissor {
@@ -238,7 +219,7 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
                     encoder.bind_shader_argument(
                         0,
                         self.local_argument,
-                        size_of::<Cascade>() * (frame_idx * 4 + i as usize),
+                        size_of::<Cascade>() * (self.shared.head * 4 + i as usize),
                     );
 
                     for (_, (transform, mesh)) in world
@@ -248,7 +229,7 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
                         encoder.bind_shader_argument(
                             1,
                             transform.argument,
-                            size_of::<GpuTransform>() * frame_idx,
+                            size_of::<GpuTransform>() * self.shared.head,
                         );
                         encoder.bind_vertex_buffer(mesh.pos_vb, 0);
                         encoder.bind_index_buffer(mesh.ib, IndexType::U32);
@@ -263,15 +244,5 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
 
             ctx.enqueue(cmd);
         });
-    }
-
-    pub fn next_working_texture(&self) {
-        let idx = (self.working_texture.load(Ordering::Acquire) + 1) % self.frames_in_flight;
-        self.working_texture.store(idx, Ordering::Release);
-    }
-
-    pub fn next_copy_texture(&self) {
-        let idx = (self.copy_texture.load(Ordering::Acquire) + 1) % self.frames_in_flight;
-        self.copy_texture.store(idx, Ordering::Release);
     }
 }

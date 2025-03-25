@@ -9,20 +9,20 @@ struct SparseEntry {
 }
 
 #[derive(Debug)]
-pub struct SparseArray<U, W> {
+pub struct SparseMap<U, W> {
     sparse: Vec<Option<SparseEntry>>,
     dense: Vec<MaybeUninit<W>>,
     dense_to_sparse: Vec<usize>,
     _marker: PhantomData<U>,
 }
 
-impl<U, W> Default for SparseArray<U, W> {
+impl<U, W> Default for SparseMap<U, W> {
     fn default() -> Self {
         Self::new(128)
     }
 }
 
-impl<U, W> SparseArray<U, W> {
+impl<U, W> SparseMap<U, W> {
     pub fn new(capacity: usize) -> Self {
         Self {
             sparse: vec![None; capacity],
@@ -126,7 +126,7 @@ impl<U, W> SparseArray<U, W> {
     }
 }
 
-impl<U, W> Drop for SparseArray<U, W> {
+impl<U, W> Drop for SparseMap<U, W> {
     fn drop(&mut self) {
         for handle in self.sparse.iter_mut() {
             if let Some(handle) = handle.take() {
