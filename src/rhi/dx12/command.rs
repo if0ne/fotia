@@ -426,8 +426,6 @@ impl RenderCommandBuffer for DxCommandBuffer {
                                     std::mem::replace(&mut *cross_state.lock(), new_state);
 
                                 if old_state != new_state {
-                                    dbg!(old_state);
-                                    dbg!(new_state);
                                     Some(dx::ResourceBarrier::transition(
                                         &cross, old_state, new_state, None,
                                     ))
@@ -631,7 +629,7 @@ impl IoCommandBuffer for DxIoCommandBuffer {
     type Device = DxDevice;
 
     fn load_to_buffer(&mut self, device: &Self::Device, buffer: &mut DxBuffer, data: &'_ [u8]) {
-        if buffer.desc.memory_location == MemoryLocation::CpuToGpu || device.desc.is_uma {
+        if buffer.desc.memory_location == MemoryLocation::CpuToGpu {
             let map = buffer.map_mut();
             map.clone_from_slice(data);
         } else {
