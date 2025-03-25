@@ -1,5 +1,6 @@
-scene_path = "./assets/scenes/pica_pica_-_mini_diorama_01/scene.gltf"
+scene_path = "./assets/scenes/issum_the_town_on_capital_isle/scene.gltf"
 asset_path = "./assets/shaders"
 scene_scale = 10.0
 shadows_far = 500.0
-cascades_count = 4
+cascades_count = 3
+cascade_size = 512

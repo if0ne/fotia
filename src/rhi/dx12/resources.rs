@@ -26,13 +26,7 @@ impl RenderResourceDevice for DxDevice {
     fn create_buffer(&self, desc: BufferDesc) -> Self::Buffer {
         let heap_props = match desc.memory_location {
             MemoryLocation::CpuToGpu => dx::HeapProperties::upload(),
-            MemoryLocation::GpuToGpu => {
-                if self.desc.is_uma {
-                    dx::HeapProperties::upload()
-                } else {
-                    dx::HeapProperties::default()
-                }
-            }
+            MemoryLocation::GpuToGpu => dx::HeapProperties::default(),
             MemoryLocation::GpuToCpu => dx::HeapProperties::readback(),
         };
 
