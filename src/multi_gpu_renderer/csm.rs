@@ -41,7 +41,7 @@ impl CascadedShadowMaps {
     }
 
     pub fn update(&mut self, camera: &Camera, light_dir: glam::Vec3) {
-        let cascade_count = self.cascades.distances.len();
+        let cascade_count = self.count;
 
         let near_clip = camera.near;
         let far_clip = self.shadow_far.unwrap_or(camera.far);
