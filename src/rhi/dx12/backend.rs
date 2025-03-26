@@ -2,7 +2,7 @@ use std::{ffi::CString, path::Path};
 
 use oxidx::dx::{
     self, IAdapter3, IBlob, IBlobExt, IDebug, IDebug1, IDebugExt, IDevice, IFactory4, IFactory6,
-    features::{Architecture1Feature, OptionsFeature},
+    features::{Architecture1Feature, Options3Feature, OptionsFeature},
 };
 use smallvec::SmallVec;
 use tracing::{debug, error, info, warn};
@@ -76,15 +76,18 @@ impl DxBackend {
 
                 if let Ok(device) = dx::create_device(Some(&adapter), dx::FeatureLevel::Level11) {
                     let mut feature = OptionsFeature::default();
-
                     device
                         .check_feature_support(&mut feature)
                         .expect("failed to check options");
 
                     let mut hardware = Architecture1Feature::new(0);
-
                     device
                         .check_feature_support(&mut hardware)
+                        .expect("failed to check options");
+
+                    let mut feature3 = Options3Feature::default();
+                    device
+                        .check_feature_support(&mut feature3)
                         .expect("failed to check options");
 
                     let ty = if desc.flags().contains(dx::AdapterFlags::Sofware) {
@@ -104,6 +107,8 @@ impl DxBackend {
                                 .cross_adapter_row_major_texture_supported(),
                             is_uma: hardware.uma(),
                             ty,
+                            copy_timestamp_support: feature3
+                                .copy_queue_timestamp_queries_supported(),
                         },
                     ));
                 }
@@ -120,15 +125,18 @@ impl DxBackend {
 
                 if let Ok(device) = dx::create_device(Some(&adapter), dx::FeatureLevel::Level11) {
                     let mut feature = OptionsFeature::default();
-
                     device
                         .check_feature_support(&mut feature)
                         .expect("failed to check options");
 
                     let mut hardware = Architecture1Feature::new(0);
-
                     device
                         .check_feature_support(&mut hardware)
+                        .expect("failed to check options");
+
+                    let mut feature3 = Options3Feature::default();
+                    device
+                        .check_feature_support(&mut feature3)
                         .expect("failed to check options");
 
                     let ty = if desc.flags().contains(dx::AdapterFlags::Sofware) {
@@ -148,6 +156,8 @@ impl DxBackend {
                                 .cross_adapter_row_major_texture_supported(),
                             is_uma: hardware.uma(),
                             ty,
+                            copy_timestamp_support: feature3
+                                .copy_queue_timestamp_queries_supported(),
                         },
                     ));
                 }
