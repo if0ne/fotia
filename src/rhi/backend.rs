@@ -27,6 +27,7 @@ pub struct RenderDeviceInfo {
     pub is_cross_adapter_texture_supported: bool,
     pub is_uma: bool,
     pub ty: DeviceType,
+    pub copy_timestamp_support: bool,
 }
 
 bitflags::bitflags! {

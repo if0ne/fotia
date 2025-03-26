@@ -2,5 +2,5 @@ scene_path = "./assets/scenes/issum_the_town_on_capital_isle/scene.gltf"
 asset_path = "./assets/shaders"
 scene_scale = 10.0
 shadows_far = 500.0
-cascades_count = 3
-cascade_size = 512
+cascades_count = 4
+cascade_size = 2048
