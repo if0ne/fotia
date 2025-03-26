@@ -25,6 +25,7 @@ pub struct PsoCollection<D: RenderDevice> {
     group: Arc<ContextDual<D>>,
     pub zpass: Handle<RasterPipeline>,
     pub csm_pass: Handle<RasterPipeline>,
+    pub multi_csm_pass: Handle<RasterPipeline>,
     pub directional_light_pass: Handle<RasterPipeline>,
     pub gamma_corr_pass: Handle<RasterPipeline>,
     pub g_pass: Handle<RasterPipeline>,
@@ -38,6 +39,7 @@ impl<D: RenderDevice> PsoCollection<D> {
     ) -> Self {
         let zpass = rs.create_raster_pipeline_handle();
         let csm_pass = rs.create_raster_pipeline_handle();
+        let multi_csm_pass = rs.create_raster_pipeline_handle();
         let directional_light_pass = rs.create_raster_pipeline_handle();
         let gamma_corr_pass = rs.create_raster_pipeline_handle();
         let g_pass = rs.create_raster_pipeline_handle();
@@ -83,6 +85,29 @@ impl<D: RenderDevice> PsoCollection<D> {
                     cull_mode: CullMode::Back,
                     vs: &shaders.csm,
                     shaders: &[],
+                },
+            );
+
+            ctx.bind_raster_pipeline(
+                multi_csm_pass,
+                RasterPipelineDesc {
+                    layout: Some(csm_layout),
+                    input_elements: &[InputElementDesc {
+                        semantic: VertexAttribute::Position(0),
+                        format: VertexType::Float3,
+                    }],
+                    depth_bias: 10000,
+                    slope_bias: 5.0,
+                    depth_clip: false,
+                    depth: Some(DepthStateDesc {
+                        op: DepthOp::LessEqual,
+                        format: Format::D32,
+                        read_only: false,
+                    }),
+                    render_targets: &[Format::R32],
+                    cull_mode: CullMode::Back,
+                    vs: &shaders.csm,
+                    shaders: &[&shaders.csm_ps],
                 },
             );
 
@@ -305,6 +330,7 @@ impl<D: RenderDevice> PsoCollection<D> {
             group,
             zpass,
             csm_pass,
+            multi_csm_pass,
             directional_light_pass,
             gamma_corr_pass,
             g_pass,
@@ -320,6 +346,7 @@ impl<D: RenderDevice> Drop for PsoCollection<D> {
             ctx.unbind_raster_pipeline(self.g_pass);
             ctx.unbind_raster_pipeline(self.directional_light_pass);
             ctx.unbind_raster_pipeline(self.csm_pass);
+            ctx.unbind_raster_pipeline(self.multi_csm_pass);
         });
 
         self.rs.free_raster_pipeline_handle(self.zpass);
@@ -328,5 +355,6 @@ impl<D: RenderDevice> Drop for PsoCollection<D> {
         self.rs
             .free_raster_pipeline_handle(self.directional_light_pass);
         self.rs.free_raster_pipeline_handle(self.csm_pass);
+        self.rs.free_raster_pipeline_handle(self.multi_csm_pass);
     }
 }

@@ -135,8 +135,8 @@ impl Application<DxDevice> {
 
         let shaders = ShaderCollection::new(&backend, cfg!(debug_assertions), &settings);
 
-        let primary = backend.create_device(0);
-        let secondary = backend.create_device(1);
+        let primary = Arc::new(backend.create_device(0));
+        let secondary = Arc::new(backend.create_device(1));
 
         let group = Arc::new(ContextDual::new(primary, secondary));
 
