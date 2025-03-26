@@ -10,6 +10,7 @@ use crate::{
 
 pub struct ShaderCollection {
     pub csm: CompiledShader,
+    pub csm_ps: CompiledShader,
     pub fullscreen: CompiledShader,
     pub directional_light_pass: CompiledShader,
     pub gamma_corr_pass: CompiledShader,
@@ -27,7 +28,15 @@ impl ShaderCollection {
         let csm = api.compile_shader(&ShaderDesc {
             ty: ShaderType::Vertex,
             path: settings.asset_path.join("Csm.hlsl"),
-            entry_point: "Main".into(),
+            entry_point: "VSMain".into(),
+            debug,
+            defines: vec![],
+        });
+
+        let csm_ps = api.compile_shader(&ShaderDesc {
+            ty: ShaderType::Pixel,
+            path: settings.asset_path.join("Csm.hlsl"),
+            entry_point: "PSMain".into(),
             debug,
             defines: vec![],
         });
@@ -85,6 +94,7 @@ impl ShaderCollection {
 
         Self {
             csm,
+            csm_ps,
             fullscreen,
             directional_light_pass,
             gamma_corr_pass,

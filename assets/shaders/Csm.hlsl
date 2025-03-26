@@ -18,10 +18,15 @@ struct PixelInput
     float4 pos : SV_POSITION;
 };
 
-PixelInput Main(VertexInput input)
+PixelInput VSMain(VertexInput input)
 {
     PixelInput output;
     output.pos = mul(proj_view, mul(transform, float4(input.pos, 1.0f)));
 
     return output;
+}
+
+float PSMain(PixelInput input) : SV_TARGET
+{
+    return input.pos.z;
 }

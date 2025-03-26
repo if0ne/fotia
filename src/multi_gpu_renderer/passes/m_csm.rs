@@ -44,6 +44,7 @@ pub struct MultiCascadedShadowMapsPass<D: RenderDevice> {
     pub gpu_csm_proj_view_buffer: Handle<Buffer>,
     pub local_argument: Handle<ShaderArgument>,
 
+    pub depth: Handle<Texture>,
     pub shared: RwcRingBuffer<Handle<Texture>, 4>,
 
     pub pso: Handle<RasterPipeline>,
@@ -58,6 +59,8 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
     ) -> Self {
         let texture_count = settings.frames_in_flight.min(3);
 
+        let depth = rs.create_texture_handle();
+
         let shared = (0..texture_count)
             .map(|_| rs.create_texture_handle())
             .collect::<SmallVec<_>>();
@@ -71,18 +74,30 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
         let local_argument = rs.create_shader_argument_handle();
 
         group.call_secondary(|ctx| {
+            ctx.bind_texture(
+                depth,
+                TextureDesc::new_2d(
+                    [2 * settings.cascade_size, 2 * settings.cascade_size],
+                    Format::D32,
+                    TextureUsages::DepthTarget,
+                )
+                .with_name("Depth for CSM".into())
+                .with_color(ClearColor::Depth(1.0)),
+                None,
+            );
+
             shared.iter().enumerate().for_each(|(i, t)| {
                 ctx.bind_texture(
                     *t,
                     TextureDesc::new_2d(
                         [2 * settings.cascade_size, 2 * settings.cascade_size],
-                        Format::D32,
-                        TextureUsages::DepthTarget
+                        Format::R32,
+                        TextureUsages::RenderTarget
                             | TextureUsages::Resource
                             | TextureUsages::Shared,
                     )
                     .with_name(format!("Shared Cascaded Shadow Maps {i}").into())
-                    .with_color(ClearColor::Depth(1.0)),
+                    .with_color(ClearColor::Color([1.0, 1.0, 1.0, 1.0])),
                     None,
                 );
             });
@@ -156,7 +171,8 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
             argument,
             gpu_csm_proj_view_buffer,
             local_argument,
-            pso: psos.csm_pass,
+            pso: psos.multi_csm_pass,
+            depth,
             shared: RwcRingBuffer::new(shared),
         }
     }
@@ -190,18 +206,19 @@ impl<D: RenderDevice> MultiCascadedShadowMapsPass<D> {
             let mut cmd = ctx.create_encoder(CommandType::Graphics);
             cmd.set_barriers(&[Barrier::Texture(
                 *self.shared.head_data(),
-                ResourceState::DepthWrite,
+                ResourceState::RenderTarget,
                 Subresource::Local(None),
             )]);
 
             {
                 let mut encoder = cmd.render(
                     "Cascaded Shadow Maps".into(),
-                    &[],
-                    Some(*self.shared.head_data()),
+                    &[*self.shared.head_data()],
+                    Some(self.depth),
                 );
                 encoder.set_render_pipeline(self.pso);
-                encoder.clear_depth(*self.shared.head_data(), None);
+                encoder.clear_depth(self.depth, None);
+                encoder.clear_rt(*self.shared.head_data(), None);
                 encoder.set_topology(GeomTopology::Triangles);
 
                 encoder.set_scissor(Scissor {
