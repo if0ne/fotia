@@ -1,5 +1,7 @@
 use std::{borrow::Cow, time::Duration};
 
+use serde::{Deserialize, Serialize};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Format {
     Unknown,
@@ -150,7 +152,7 @@ pub enum GeomTopology {
     Lines,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Timings {
     pub timings: Vec<(Cow<'static, str>, Duration)>,
     pub total: Duration,

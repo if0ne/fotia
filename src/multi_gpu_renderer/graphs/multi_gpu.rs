@@ -4,6 +4,7 @@ use hecs::World;
 use tracing::info;
 
 use crate::{
+    TimingsInfo,
     collections::{handle::Handle, rwc_ring_buffer::RwcState},
     engine::camera::Camera,
     multi_gpu_renderer::{
@@ -34,6 +35,7 @@ pub struct MultiGpuShadows<D: RenderDevice> {
     pub gpass: GPass<D>,
     pub dir_pass: DirectionalLightPass<D>,
     pub final_pass: GammaCorrectionPass<D>,
+    pub sender: Option<std::sync::mpsc::Sender<TimingsInfo>>,
 }
 
 impl<D: RenderDevice> MultiGpuShadows<D> {
@@ -43,6 +45,7 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
         extent: [u32; 2],
         psos: &PsoCollection<D>,
         settings: &RenderSettings,
+        sender: Option<std::sync::mpsc::Sender<TimingsInfo>>,
     ) -> Self {
         let zpass = ZPass::new(Arc::clone(&rs), Arc::clone(&ctx.primary), extent, psos);
         let csm =
@@ -83,6 +86,7 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
             gpass,
             dir_pass,
             final_pass,
+            sender,
         }
     }
 
@@ -107,7 +111,16 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
             self.ctx.call_secondary(|ctx| {
                 let mut cmd = ctx.create_encoder(CommandType::Graphics);
                 let timings = cmd.begin(ctx);
-                info!("Secondary Timings: {:?}", timings);
+
+                if let Some(sdr) = &mut self.sender {
+                    if let Some(timings) = timings {
+                        sdr.send(TimingsInfo::SecondaryMultiGpu(timings))
+                            .expect("failed to send");
+                    }
+                } else {
+                    info!("Secondary Timings: {:?}", timings);
+                }
+
                 ctx.enqueue(cmd);
 
                 self.csm.render(world);
@@ -148,7 +161,15 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
                 self.ctx.call_primary(|ctx| {
                     let mut cmd = ctx.create_encoder(CommandType::Transfer);
                     let timings = cmd.begin(ctx);
-                    info!("Copy Timings: {:?}", timings);
+
+                    if let Some(sdr) = &mut self.sender {
+                        if let Some(timings) = timings {
+                            sdr.send(TimingsInfo::PrimaryMultiGpu(timings))
+                                .expect("failed to send");
+                        }
+                    } else {
+                        info!("Copy Timings: {:?}", timings);
+                    }
 
                     cmd.set_barriers(&[
                         Barrier::Texture(
