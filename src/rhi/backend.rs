@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use serde::{Deserialize, Serialize};
+
 use super::shader::{CompiledShader, ShaderDesc};
 
 pub type RenderDeviceId = usize;
@@ -13,14 +15,14 @@ pub trait Api {
     fn compile_shader<P: AsRef<Path>>(&self, desc: &ShaderDesc<'_, P>) -> CompiledShader;
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DeviceType {
     Discrete,
     Integrated,
     Cpu,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RenderDeviceInfo {
     pub name: String,
     pub id: RenderDeviceId,

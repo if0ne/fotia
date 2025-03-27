@@ -31,7 +31,7 @@ use ra::{
     system::{RenderBackend, RenderBackendSettings, RenderSystem},
 };
 use rhi::{
-    backend::{Api, DebugFlags},
+    backend::{Api, DebugFlags, RenderDeviceInfo},
     command::{CommandType, Subresource},
     dx12::device::DxDevice,
     resources::BufferUsages,
@@ -48,12 +48,18 @@ use winit::{
     raw_window_handle::{HasWindowHandle, RawWindowHandle},
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum TimingsInfo {
+    GpuInfo {
+        primary: RenderDeviceInfo,
+        secondary: RenderDeviceInfo,
+    },
     PrimarySingleGpu(Timings),
     PrimaryMultiGpu(Timings),
     SecondaryMultiGpu(Timings),
-    CpuTotal(std::time::Duration),
+    SingleCpuTotal(std::time::Duration),
+    MultiCpuTotal(std::time::Duration),
+    End,
 }
 
 pub struct WindowContext<D: RenderDevice> {
@@ -135,18 +141,19 @@ fn main() {
         let mut connection = std::net::TcpStream::connect(addr).expect("wrong TCP-address");
 
         let thread = std::thread::spawn(move || {
-            let mut batching = vec![];
+            let mut timings = vec![];
             while let Ok(data) = rcv.recv_timeout(std::time::Duration::from_secs(30)) {
-                batching.push(data);
-
-                if batching.len() > 30 {
-                    let data = batching.drain(..).collect::<Vec<_>>();
+                if data == TimingsInfo::End {
+                    let data = timings.drain(..).collect::<Vec<_>>();
                     let json = serde_json::to_string(&data).expect("failed to serialize");
 
                     connection
                         .write_all(json.as_bytes())
                         .expect("failed to send data to server");
+                    return;
                 }
+
+                timings.push(data);
             }
         });
 
@@ -155,8 +162,11 @@ fn main() {
         (None, None)
     };
 
-    let mut app = Application::new(settings, sdr);
+    let mut app = Application::new(settings, sdr.clone());
     event_loop.run_app(&mut app).expect("failed to run app");
+    if let Some(sdr) = sdr {
+        sdr.send(TimingsInfo::End).expect("failed to send message");
+    }
 
     if let Some(thread) = thread {
         thread.join().expect("failed to join");
@@ -180,6 +190,16 @@ impl Application<DxDevice> {
         let backend = rs.dx_backend().expect("failed to get directx backend");
 
         let shaders = ShaderCollection::new(&backend, cfg!(debug_assertions), &settings);
+
+        if let Some(sender) = &sender {
+            let mut info = backend.enumerate_devices().take(2).cloned();
+            sender
+                .send(TimingsInfo::GpuInfo {
+                    primary: info.next().expect("failed to get gpu info"),
+                    secondary: info.next().expect("failed to get gpu info"),
+                })
+                .expect("failed to send");
+        }
 
         let primary = Arc::new(backend.create_device(0));
         let secondary = Arc::new(backend.create_device(1));
@@ -425,8 +445,14 @@ impl<D: RenderDevice> Application<D> {
             frame.last_access = ctx.submit(CommandType::Graphics);
 
             if let Some(sdr) = &mut self.bench_sender {
-                sdr.send(TimingsInfo::CpuTotal(time.elapsed()))
-                    .expect("failed to send");
+                match self.render_mode {
+                    RenderMode::SingleGpu => sdr
+                        .send(TimingsInfo::SingleCpuTotal(time.elapsed()))
+                        .expect("failed to send"),
+                    RenderMode::MultiGpu => sdr
+                        .send(TimingsInfo::MultiCpuTotal(time.elapsed()))
+                        .expect("failed to send"),
+                }
             } else {
                 info!("CPU TIME: {:?}", time.elapsed());
             }

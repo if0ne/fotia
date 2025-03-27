@@ -152,7 +152,7 @@ pub enum GeomTopology {
     Lines,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Timings {
     pub timings: Vec<(Cow<'static, str>, Duration)>,
     pub total: Duration,
