@@ -665,6 +665,7 @@ dependencies = [
  "parking_lot",
  "range-alloc",
  "serde",
+ "serde_json",
  "smallvec",
  "toml",
  "tracing",

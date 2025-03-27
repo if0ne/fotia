@@ -7,7 +7,7 @@ pub mod timer;
 mod multi_gpu_renderer;
 mod settings;
 
-use std::{cell::RefCell, collections::HashMap, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, io::Write, sync::Arc};
 
 use collections::handle::Handle;
 use engine::{
@@ -36,8 +36,9 @@ use rhi::{
     dx12::device::DxDevice,
     resources::BufferUsages,
     swapchain::{PresentMode, SwapchainDesc},
-    types::ResourceState,
+    types::{ResourceState, Timings},
 };
+use serde::{Deserialize, Serialize};
 use settings::{RenderSettings, read_settings};
 use timer::GameTimer;
 use tracing::info;
@@ -46,6 +47,14 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     raw_window_handle::{HasWindowHandle, RawWindowHandle},
 };
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum TimingsInfo {
+    PrimarySingleGpu(Timings),
+    PrimaryMultiGpu(Timings),
+    SecondaryMultiGpu(Timings),
+    CpuTotal(std::time::Duration),
+}
 
 pub struct WindowContext<D: RenderDevice> {
     pub window: winit::window::Window,
@@ -99,6 +108,8 @@ pub struct Application<D: RenderDevice> {
     pub global_argument: Handle<ShaderArgument>,
 
     pub placeholders: TexturePlaceholders,
+
+    pub bench_sender: Option<std::sync::mpsc::Sender<TimingsInfo>>,
 }
 
 fn main() {
@@ -116,12 +127,44 @@ fn main() {
 
     let settings = read_settings();
 
-    let mut app = Application::new(settings);
+    let (sdr, thread) = if let Some(addr) = &settings.bench_addr {
+        let (sdr, rcv) = std::sync::mpsc::channel();
+        let mut connection = std::net::TcpStream::connect(addr).expect("wrong TCP-address");
+
+        let thread = std::thread::spawn(move || {
+            let mut batching = vec![];
+            while let Ok(data) = rcv.recv_timeout(std::time::Duration::from_secs(30)) {
+                batching.push(data);
+
+                if batching.len() > 30 {
+                    let data = batching.drain(..).collect::<Vec<_>>();
+                    let json = serde_json::to_string(&data).expect("failed to serialize");
+
+                    connection
+                        .write_all(json.as_bytes())
+                        .expect("failed to send data to server");
+                }
+            }
+        });
+
+        (Some(sdr), Some(thread))
+    } else {
+        (None, None)
+    };
+
+    let mut app = Application::new(settings, sdr);
     event_loop.run_app(&mut app).expect("failed to run app");
+
+    if let Some(thread) = thread {
+        thread.join().expect("failed to join");
+    }
 }
 
 impl Application<DxDevice> {
-    fn new(settings: RenderSettings) -> Application<DxDevice> {
+    fn new(
+        settings: RenderSettings,
+        sender: Option<std::sync::mpsc::Sender<TimingsInfo>>,
+    ) -> Application<DxDevice> {
         let rs = Arc::new(RenderSystem::new(&[RenderBackendSettings {
             api: RenderBackend::Dx12,
             debug: if cfg!(debug_assertions) {
@@ -156,6 +199,7 @@ impl Application<DxDevice> {
             [settings.width, settings.height],
             &psos,
             &settings,
+            sender.clone(),
         );
 
         let mut world = World::new();
@@ -227,6 +271,7 @@ impl Application<DxDevice> {
             placeholders,
 
             keys: HashMap::new(),
+            bench_sender: sender,
         }
     }
 }
@@ -318,7 +363,21 @@ impl<D: RenderDevice> Application<D> {
             ctx.wait_on_cpu(CommandType::Graphics, frame.last_access);
             let mut encoder = ctx.create_encoder(CommandType::Graphics);
             let timings = encoder.begin(ctx);
-            info!("Timings: {:?}", timings);
+
+            if let Some(sdr) = &mut self.bench_sender {
+                if let Some(timings) = timings {
+                    match self.render_mode {
+                        RenderMode::SingleGpu => sdr
+                            .send(TimingsInfo::PrimarySingleGpu(timings))
+                            .expect("failed to send"),
+                        RenderMode::MultiGpu => sdr
+                            .send(TimingsInfo::PrimaryMultiGpu(timings))
+                            .expect("failed to send"),
+                    }
+                }
+            } else {
+                info!("Timings: {:?}", timings);
+            }
 
             encoder.set_barriers(&[Barrier::Texture(
                 frame.texture,
@@ -350,8 +409,6 @@ impl<D: RenderDevice> Application<D> {
                 }
             }
 
-            info!("CPU TIME: {:?}", time.elapsed());
-
             let mut encoder = ctx.create_encoder(CommandType::Graphics);
             encoder.set_barriers(&[Barrier::Texture(
                 frame.texture,
@@ -361,6 +418,13 @@ impl<D: RenderDevice> Application<D> {
 
             ctx.commit(encoder);
             frame.last_access = ctx.submit(CommandType::Graphics);
+
+            if let Some(sdr) = &mut self.bench_sender {
+                sdr.send(TimingsInfo::CpuTotal(time.elapsed()))
+                    .expect("failed to send");
+            } else {
+                info!("CPU TIME: {:?}", time.elapsed());
+            }
         });
 
         wnd.swapchain.present();
