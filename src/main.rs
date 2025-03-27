@@ -101,6 +101,8 @@ pub struct Application<D: RenderDevice> {
 
     pub frames_in_flight: usize,
     pub frame_idx: usize,
+    pub total_frames: usize,
+
     pub camera: Camera,
     pub fps_controller: FpsController,
 
@@ -110,6 +112,7 @@ pub struct Application<D: RenderDevice> {
     pub placeholders: TexturePlaceholders,
 
     pub bench_sender: Option<std::sync::mpsc::Sender<TimingsInfo>>,
+    pub is_bench_mode: bool,
 }
 
 fn main() {
@@ -271,6 +274,8 @@ impl Application<DxDevice> {
             placeholders,
 
             keys: HashMap::new(),
+            is_bench_mode: sender.is_some(),
+            total_frames: 0,
             bench_sender: sender,
         }
     }
@@ -513,6 +518,10 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
             }
             winit::event::WindowEvent::KeyboardInput { event, .. } => match event.state {
                 winit::event::ElementState::Pressed => {
+                    if self.is_bench_mode {
+                        return;
+                    }
+
                     if event.physical_key == winit::keyboard::KeyCode::Escape {
                         event_loop.exit();
                     } else if event.physical_key == KeyCode::Digit1 {
@@ -551,11 +560,17 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                 self.camera.resize([size.width, size.height]);
             }
             winit::event::WindowEvent::RedrawRequested => {
+                if self.total_frames > 3000 && self.is_bench_mode {
+                    event_loop.exit();
+                }
+
                 self.timer.tick();
                 self.calculate_frame_stats();
 
                 self.update();
                 self.render();
+
+                self.total_frames += 1;
             }
             winit::event::WindowEvent::CloseRequested => event_loop.exit(),
             _ => (),
