@@ -560,7 +560,11 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                 self.camera.resize([size.width, size.height]);
             }
             winit::event::WindowEvent::RedrawRequested => {
-                if self.total_frames > 3000 && self.is_bench_mode {
+                if self.total_frames > 5000 && self.render_mode != RenderMode::MultiGpu {
+                    self.render_mode = RenderMode::MultiGpu;
+                }
+
+                if self.total_frames > 10000 && self.is_bench_mode {
                     event_loop.exit();
                 }
 
