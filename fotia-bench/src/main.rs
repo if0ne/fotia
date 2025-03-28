@@ -1,4 +1,7 @@
+mod settings;
+
 use serde::{Deserialize, Serialize};
+use settings::read_settings;
 use std::{borrow::Cow, collections::HashMap, time::Duration};
 use tokio::{io::AsyncReadExt, net::TcpListener, process::Command};
 
@@ -47,6 +50,8 @@ struct BenchmarkResult {
 #[derive(Clone, Debug, PartialEq)]
 struct SceneBenchmark {
     scene_name: String,
+    cascades_size: u32,
+    cascades_count: u32,
     single_cpu: Vec<Duration>,
     single_gpu: Vec<Duration>,
     single_passes: HashMap<String, Vec<Duration>>,
@@ -62,6 +67,8 @@ struct SceneBenchmark {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct SceneBenchmarkResult {
     scene_name: String,
+    cascades_size: u32,
+    cascades_count: u32,
     single_cpu_avg: Duration,
     single_gpu_avg: Duration,
     single_passes_avg: HashMap<String, Duration>,
@@ -75,9 +82,11 @@ struct SceneBenchmarkResult {
 }
 
 impl SceneBenchmark {
-    fn new(scene: &str) -> Self {
+    fn new(scene: &str, cascades_size: u32, cascades_count: u32) -> Self {
         Self {
             scene_name: scene.to_string(),
+            cascades_size,
+            cascades_count,
             single_cpu: Vec::new(),
             single_gpu: Vec::new(),
             single_passes: HashMap::new(),
@@ -116,8 +125,6 @@ impl SceneBenchmark {
             .multi_primary_passes
             .into_iter()
             .map(|(pass, times)| {
-                dbg!(&pass);
-                dbg!(&times.len());
                 let avg_time = times.iter().sum::<Duration>() / times.len() as u32;
                 (pass, avg_time)
             })
@@ -134,6 +141,8 @@ impl SceneBenchmark {
 
         SceneBenchmarkResult {
             scene_name: self.scene_name,
+            cascades_size: self.cascades_size,
+            cascades_count: self.cascades_count,
             single_cpu_avg,
             single_gpu_avg,
             single_passes_avg,
@@ -149,9 +158,14 @@ impl SceneBenchmark {
 async fn benchmark_scene(
     scene: &str,
     bench_addr: &str,
+    width: u32,
+    height: u32,
+    cascades_size: u32,
+    cascades_count: u32,
+    bench_frames: usize,
     bench_result: &mut BenchmarkResult,
 ) -> anyhow::Result<()> {
-    let mut bench_scene = SceneBenchmark::new(scene);
+    let mut bench_scene = SceneBenchmark::new(scene, cascades_size, cascades_count);
     let listener = TcpListener::bind(bench_addr).await?;
 
     let mut app = Command::new("fotia.exe")
@@ -159,6 +173,16 @@ async fn benchmark_scene(
         .arg(scene)
         .arg("--bench-addr")
         .arg(bench_addr)
+        .arg("--width")
+        .arg(width.to_string())
+        .arg("--height")
+        .arg(height.to_string())
+        .arg("--cascade-size")
+        .arg(cascades_size.to_string())
+        .arg("--cascades-count")
+        .arg(cascades_count.to_string())
+        .arg("--bench-frames")
+        .arg(bench_frames.to_string())
         .spawn()?;
 
     let (mut stream, _) = listener.accept().await?;
@@ -213,6 +237,8 @@ async fn benchmark_scene(
 
     bench_result.benchmarks.push(bench_scene.calculate_result());
 
+    app.kill().await?;
+
     Ok(())
 }
 
@@ -222,15 +248,30 @@ async fn main() -> anyhow::Result<()> {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    let scenes = vec!["./assets/scenes/issum_the_town_on_capital_isle/scene.gltf".to_string()];
+    let settings = read_settings();
     let mut bench_result = BenchmarkResult::default();
 
-    let bench_addr = "127.0.0.1:7878";
+    let bench_addr = format!("127.0.0.1:{}", settings.port);
 
-    for scene in scenes {
+    for scene in settings.scenes {
         println!("Starting benchmark for scene: {}", scene);
-        if let Err(e) = benchmark_scene(&scene, bench_addr, &mut bench_result).await {
-            eprintln!("Error benchmarking {}: {}", scene, e);
+        for size in [1024, 2048, 4096] {
+            for count in [3, 4] {
+                if let Err(e) = benchmark_scene(
+                    &scene,
+                    &bench_addr,
+                    settings.width,
+                    settings.height,
+                    size,
+                    count,
+                    settings.bench_frames,
+                    &mut bench_result,
+                )
+                .await
+                {
+                    eprintln!("Error benchmarking {}: {}", scene, e);
+                }
+            }
         }
     }
 

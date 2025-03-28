@@ -31,6 +31,9 @@ pub struct CliRenderSettings {
     pub bench_addr: Option<String>,
 
     #[arg(long)]
+    pub bench_frames: Option<usize>,
+
+    #[arg(long)]
     pub frames_in_flight: Option<usize>,
 
     #[arg(long)]
@@ -66,6 +69,9 @@ pub struct TomlRenderSettings {
 
     pub bench_addr: Option<String>,
 
+    #[serde(default = "default_bench_frames")]
+    pub bench_frames: usize,
+
     #[serde(default = "default_frames_in_flight")]
     pub frames_in_flight: usize,
 
@@ -88,6 +94,7 @@ pub struct RenderSettings {
     pub asset_path: PathBuf,
     pub scene_scale: f32,
     pub bench_addr: Option<String>,
+    pub bench_frames: usize,
     pub frames_in_flight: usize,
     pub camera_far: f32,
     pub shadows_far: Option<f32>,
@@ -118,6 +125,7 @@ pub fn read_settings() -> RenderSettings {
         camera_far: cli.camera_far.unwrap_or_else(default_camera_far),
         shadows_far: cli.shadows_far,
         cascades_lambda: cli.cascades_lambda.unwrap_or_else(default_cascades_lambda),
+        bench_frames: cli.bench_frames.unwrap_or_else(default_bench_frames),
     }
 }
 
@@ -143,6 +151,7 @@ pub fn merge_settings(cli: CliRenderSettings, toml: TomlRenderSettings) -> Rende
         camera_far: cli.camera_far.unwrap_or(toml.camera_far),
         shadows_far: cli.shadows_far.or(toml.shadows_far),
         cascades_lambda: cli.cascades_lambda.unwrap_or(toml.cascades_lambda),
+        bench_frames: cli.bench_frames.unwrap_or(toml.bench_frames),
     }
 }
 
@@ -176,4 +185,8 @@ fn default_camera_far() -> f32 {
 
 fn default_cascades_lambda() -> f32 {
     0.5
+}
+
+fn default_bench_frames() -> usize {
+    5000
 }

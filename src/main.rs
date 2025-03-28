@@ -120,6 +120,8 @@ pub struct Application<D: RenderDevice> {
     pub bench_sender: Option<std::sync::mpsc::Sender<TimingsInfo>>,
     pub is_bench_mode: bool,
     pub buffer_frames: usize,
+
+    pub bench_frames: usize,
 }
 
 fn main() {
@@ -300,6 +302,8 @@ impl Application<DxDevice> {
             total_frames: 0,
             bench_sender: sender,
             buffer_frames: 0,
+
+            bench_frames: settings.bench_frames,
         }
     }
 }
@@ -597,12 +601,15 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
                 self.camera.resize([size.width, size.height]);
             }
             winit::event::WindowEvent::RedrawRequested => {
-                if self.total_frames > 5000 && self.render_mode != RenderMode::MultiGpu {
+                if self.is_bench_mode
+                    && self.total_frames > self.bench_frames / 2
+                    && self.render_mode != RenderMode::MultiGpu
+                {
                     self.render_mode = RenderMode::MultiGpu;
                     self.buffer_frames = self.frames_in_flight;
                 }
 
-                if self.total_frames > 10000 && self.is_bench_mode {
+                if self.is_bench_mode && self.total_frames > self.bench_frames {
                     event_loop.exit();
                 }
 
