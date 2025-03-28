@@ -1,10 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, collections::HashMap, time::Duration};
-use tokio::{
-    io::AsyncReadExt,
-    net::{TcpListener, TcpStream},
-    process::Command,
-};
+use tokio::{io::AsyncReadExt, net::TcpListener, process::Command};
 
 #[derive(Debug, Serialize, Deserialize)]
 enum TimingsInfo {
@@ -42,108 +38,120 @@ struct RenderDeviceInfo {
     pub copy_timestamp_support: bool,
 }
 
-struct BenchmarkResults {
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+struct BenchmarkResult {
+    pub gpus: Vec<RenderDeviceInfo>,
+    pub benchmarks: Vec<SceneBenchmarkResult>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct SceneBenchmark {
     scene_name: String,
     single_cpu: Vec<Duration>,
     single_gpu: Vec<Duration>,
     single_passes: HashMap<String, Vec<Duration>>,
+
     multi_cpu: Vec<Duration>,
     multi_primary_gpu: Vec<Duration>,
     multi_secondary_gpu: Vec<Duration>,
+
     multi_primary_passes: HashMap<String, Vec<Duration>>,
     multi_secondary_passes: HashMap<String, Vec<Duration>>,
 }
 
-impl BenchmarkResults {
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+struct SceneBenchmarkResult {
+    scene_name: String,
+    single_cpu_avg: Duration,
+    single_gpu_avg: Duration,
+    single_passes_avg: HashMap<String, Duration>,
+
+    multi_cpu_avg: Duration,
+    multi_primary_gpu_avg: Duration,
+    multi_secondary_gpu_avg: Duration,
+
+    multi_primary_passes_avg: HashMap<String, Duration>,
+    multi_secondary_passes_avg: HashMap<String, Duration>,
+}
+
+impl SceneBenchmark {
     fn new(scene: &str) -> Self {
         Self {
             scene_name: scene.to_string(),
-            single_cpu: Vec::with_capacity(5000),
-            single_gpu: Vec::with_capacity(5000),
+            single_cpu: Vec::new(),
+            single_gpu: Vec::new(),
             single_passes: HashMap::new(),
-            multi_cpu: Vec::with_capacity(5000),
-            multi_primary_gpu: Vec::with_capacity(5000),
-            multi_secondary_gpu: Vec::with_capacity(5000),
+            multi_cpu: Vec::new(),
+            multi_primary_gpu: Vec::new(),
+            multi_secondary_gpu: Vec::new(),
             multi_primary_passes: HashMap::new(),
             multi_secondary_passes: HashMap::new(),
         }
     }
 
-    fn process_single_frame(&mut self, cpu: Duration, gpu: &Timings) {
-        self.single_cpu.push(cpu);
-        self.single_gpu.push(gpu.total);
-
-        for (pass, duration) in &gpu.timings {
-            self.single_passes
-                .entry(pass.to_string())
-                .or_default()
-                .push(*duration);
-        }
-    }
-
-    fn process_multi_frame(&mut self, cpu: Duration, primary: &Timings, secondary: &Timings) {
-        self.multi_cpu.push(cpu);
-        self.multi_primary_gpu.push(primary.total);
-        self.multi_secondary_gpu.push(secondary.total);
-
-        for (pass, duration) in &primary.timings {
-            self.multi_primary_passes
-                .entry(pass.to_string())
-                .or_default()
-                .push(*duration);
-        }
-
-        for (pass, duration) in &secondary.timings {
-            self.multi_secondary_passes
-                .entry(pass.to_string())
-                .or_default()
-                .push(*duration);
-        }
-    }
-
-    fn calculate_stats(&self) {
+    fn calculate_result(self) -> SceneBenchmarkResult {
         println!("\nBenchmark results for scene: {}", self.scene_name);
 
-        // Single GPU stats
         let single_cpu_avg =
             self.single_cpu.iter().sum::<Duration>() / self.single_cpu.len() as u32;
         let single_gpu_avg =
             self.single_gpu.iter().sum::<Duration>() / self.single_gpu.len() as u32;
 
-        println!("\nSingle GPU:");
-        println!("Average CPU time: {:?}", single_cpu_avg);
-        println!("Average GPU time: {:?}", single_gpu_avg);
-        println!("Render passes:");
-        self.print_passes(&self.single_passes);
+        let single_passes_avg = self
+            .single_passes
+            .into_iter()
+            .map(|(pass, times)| {
+                let avg_time = times.iter().sum::<Duration>() / times.len() as u32;
+                (pass, avg_time)
+            })
+            .collect();
 
-        // Multi GPU stats
         let multi_cpu_avg = self.multi_cpu.iter().sum::<Duration>() / self.multi_cpu.len() as u32;
-        let primary_gpu_avg =
+        let multi_primary_gpu_avg =
             self.multi_primary_gpu.iter().sum::<Duration>() / self.multi_primary_gpu.len() as u32;
-        let secondary_gpu_avg = self.multi_secondary_gpu.iter().sum::<Duration>()
+        let multi_secondary_gpu_avg = self.multi_secondary_gpu.iter().sum::<Duration>()
             / self.multi_secondary_gpu.len() as u32;
 
-        println!("\nMulti GPU:");
-        println!("Average CPU time: {:?}", multi_cpu_avg);
-        println!("Primary GPU average: {:?}", primary_gpu_avg);
-        println!("Secondary GPU average: {:?}", secondary_gpu_avg);
+        let multi_primary_passes_avg = self
+            .multi_primary_passes
+            .into_iter()
+            .map(|(pass, times)| {
+                dbg!(&pass);
+                dbg!(&times.len());
+                let avg_time = times.iter().sum::<Duration>() / times.len() as u32;
+                (pass, avg_time)
+            })
+            .collect();
 
-        println!("\nPrimary GPU passes:");
-        self.print_passes(&self.multi_primary_passes);
-        println!("\nSecondary GPU passes:");
-        self.print_passes(&self.multi_secondary_passes);
-    }
+        let multi_secondary_passes_avg = self
+            .multi_secondary_passes
+            .into_iter()
+            .map(|(pass, times)| {
+                let avg_time = times.iter().sum::<Duration>() / times.len() as u32;
+                (pass, avg_time)
+            })
+            .collect();
 
-    fn print_passes(&self, passes: &HashMap<String, Vec<Duration>>) {
-        for (pass, times) in passes {
-            let avg = times.iter().sum::<Duration>() / times.len() as u32;
-            println!("  {}: {:?} (avg)", pass, avg);
+        SceneBenchmarkResult {
+            scene_name: self.scene_name,
+            single_cpu_avg,
+            single_gpu_avg,
+            single_passes_avg,
+            multi_cpu_avg,
+            multi_primary_gpu_avg,
+            multi_secondary_gpu_avg,
+            multi_primary_passes_avg,
+            multi_secondary_passes_avg,
         }
     }
 }
 
-async fn benchmark_scene(scene: &str, bench_addr: &str) -> anyhow::Result<()> {
-    let mut results = BenchmarkResults::new(scene);
+async fn benchmark_scene(
+    scene: &str,
+    bench_addr: &str,
+    bench_result: &mut BenchmarkResult,
+) -> anyhow::Result<()> {
+    let mut bench_scene = SceneBenchmark::new(scene);
     let listener = TcpListener::bind(bench_addr).await?;
 
     let mut app = Command::new("fotia.exe")
@@ -160,57 +168,73 @@ async fn benchmark_scene(scene: &str, bench_addr: &str) -> anyhow::Result<()> {
 
     let messages: Vec<TimingsInfo> = serde_json::from_slice(&json_data)?;
 
-    // Группируем сообщения по типам
-    let mut single_gpu = Vec::new();
-    let mut multi_primary = Vec::new();
-    let mut multi_secondary = Vec::new();
-    let mut single_cpu_total = Vec::new();
-    let mut multi_cpu_total = Vec::new();
-
     for msg in messages {
         match msg {
-            TimingsInfo::PrimarySingleGpu(t) => single_gpu.push(t),
-            TimingsInfo::SingleCpuTotal(d) => single_cpu_total.push(d),
-            TimingsInfo::PrimaryMultiGpu(t) => multi_primary.push(t),
-            TimingsInfo::SecondaryMultiGpu(t) => multi_secondary.push(t),
-            TimingsInfo::MultiCpuTotal(d) => multi_cpu_total.push(d),
-            _ => {}
+            TimingsInfo::PrimarySingleGpu(t) => {
+                for (pass, duration) in &t.timings {
+                    bench_scene
+                        .single_passes
+                        .entry(pass.to_string())
+                        .or_default()
+                        .push(*duration);
+                }
+                bench_scene.single_gpu.push(t.total);
+            }
+            TimingsInfo::SingleCpuTotal(d) => bench_scene.single_cpu.push(d),
+            TimingsInfo::PrimaryMultiGpu(t) => {
+                for (pass, duration) in &t.timings {
+                    bench_scene
+                        .multi_primary_passes
+                        .entry(pass.to_string())
+                        .or_default()
+                        .push(*duration);
+                }
+                bench_scene.multi_primary_gpu.push(t.total);
+            }
+            TimingsInfo::SecondaryMultiGpu(t) => {
+                for (pass, duration) in &t.timings {
+                    bench_scene
+                        .multi_secondary_passes
+                        .entry(pass.to_string())
+                        .or_default()
+                        .push(*duration);
+                }
+                bench_scene.multi_secondary_gpu.push(t.total);
+            }
+            TimingsInfo::MultiCpuTotal(d) => bench_scene.multi_cpu.push(d),
+            TimingsInfo::GpuInfo { primary, secondary } => {
+                if bench_result.gpus.is_empty() {
+                    bench_result.gpus.push(primary);
+                    bench_result.gpus.push(secondary);
+                }
+            }
         }
     }
 
-    // Обработка Single GPU режима
-    let single_frames = single_gpu.len().min(single_cpu_total.len());
-    for i in 0..single_frames {
-        results.process_single_frame(single_cpu_total[i], &single_gpu[i]);
-    }
+    bench_result.benchmarks.push(bench_scene.calculate_result());
 
-    // Обработка Multi GPU режима
-    let multi_frames = multi_primary
-        .len()
-        .min(multi_secondary.len())
-        .min(multi_cpu_total.len());
-
-    for i in 0..multi_frames {
-        results.process_multi_frame(multi_cpu_total[i], &multi_primary[i], &multi_secondary[i]);
-    }
-
-    app.kill().await?;
-    results.calculate_stats();
     Ok(())
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    unsafe {
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
+
     let scenes = vec!["./assets/scenes/issum_the_town_on_capital_isle/scene.gltf".to_string()];
+    let mut bench_result = BenchmarkResult::default();
 
     let bench_addr = "127.0.0.1:7878";
 
     for scene in scenes {
         println!("Starting benchmark for scene: {}", scene);
-        if let Err(e) = benchmark_scene(&scene, bench_addr).await {
+        if let Err(e) = benchmark_scene(&scene, bench_addr, &mut bench_result).await {
             eprintln!("Error benchmarking {}: {}", scene, e);
         }
     }
+
+    dbg!(bench_result);
 
     Ok(())
 }

@@ -119,6 +119,7 @@ pub struct Application<D: RenderDevice> {
 
     pub bench_sender: Option<std::sync::mpsc::Sender<TimingsInfo>>,
     pub is_bench_mode: bool,
+    pub buffer_frames: usize,
 }
 
 fn main() {
@@ -294,9 +295,11 @@ impl Application<DxDevice> {
             placeholders,
 
             keys: HashMap::new(),
+
             is_bench_mode: sender.is_some(),
             total_frames: 0,
             bench_sender: sender,
+            buffer_frames: 0,
         }
     }
 }
@@ -395,9 +398,16 @@ impl<D: RenderDevice> Application<D> {
                         RenderMode::SingleGpu => sdr
                             .send(TimingsInfo::PrimarySingleGpu(timings))
                             .expect("failed to send"),
-                        RenderMode::MultiGpu => sdr
-                            .send(TimingsInfo::PrimaryMultiGpu(timings))
-                            .expect("failed to send"),
+                        RenderMode::MultiGpu => {
+                            if self.buffer_frames == 0 {
+                                sdr.send(TimingsInfo::PrimaryMultiGpu(timings))
+                                    .expect("failed to send")
+                            } else {
+                                sdr.send(TimingsInfo::PrimarySingleGpu(timings))
+                                    .expect("failed to send");
+                                self.buffer_frames -= 1;
+                            }
+                        }
                     }
                 }
             } else {
@@ -449,12 +459,13 @@ impl<D: RenderDevice> Application<D> {
                     RenderMode::SingleGpu => sdr
                         .send(TimingsInfo::SingleCpuTotal(time.elapsed()))
                         .expect("failed to send"),
-                    RenderMode::MultiGpu => sdr
-                        .send(TimingsInfo::MultiCpuTotal(time.elapsed()))
-                        .expect("failed to send"),
+                    RenderMode::MultiGpu => {
+                        sdr.send(TimingsInfo::MultiCpuTotal(time.elapsed()))
+                            .expect("failed to send");
+                    }
                 }
             } else {
-                info!("CPU TIME: {:?}", time.elapsed());
+                info!("CPU time: {:?}", time.elapsed());
             }
         });
 
@@ -497,7 +508,7 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         let window_attributes = winit::window::Window::default_attributes()
             .with_title(&self.title)
-            .with_inner_size(winit::dpi::PhysicalSize::new(800, 600));
+            .with_inner_size(winit::dpi::PhysicalSize::new(self.width, self.height));
 
         let window = event_loop.create_window(window_attributes).unwrap();
         /*window
@@ -588,6 +599,7 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
             winit::event::WindowEvent::RedrawRequested => {
                 if self.total_frames > 5000 && self.render_mode != RenderMode::MultiGpu {
                     self.render_mode = RenderMode::MultiGpu;
+                    self.buffer_frames = self.frames_in_flight;
                 }
 
                 if self.total_frames > 10000 && self.is_bench_mode {
