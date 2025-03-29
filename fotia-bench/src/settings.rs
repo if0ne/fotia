@@ -9,8 +9,10 @@ pub struct BenchSettings {
     pub bench_frames: usize,
 }
 
-pub fn read_settings() -> BenchSettings {
-    let content = std::fs::read_to_string("bench.toml").expect("failed to open config");
+pub async fn read_settings() -> BenchSettings {
+    let content = tokio::fs::read_to_string("bench.toml")
+        .await
+        .expect("failed to open config");
 
     toml::from_str(&content).expect("failed to parse toml")
 }
