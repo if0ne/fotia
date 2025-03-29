@@ -1,28 +1,3 @@
-#include "Common.hlsl"
-#include "Pbr.hlsl"
-
-cbuffer GlobalBuffer : register(b0, space0) {
-    Globals g_data;
-}
-
-cbuffer ObjectTransform : register(b0, space1)
-{
-    matrix transform;
-}
-
-struct VertexInput {
-    float3 pos : POSITION;
-};
-
-struct PixelInput {
-    float4 pos : SV_POSITION;
-};
-
-PixelInput Main(VertexInput input) {
-    PixelInput output = (PixelInput) 0;
-
-    float4 world_pos = mul(transform, float4(input.pos, 1.0f));
-    output.pos = mul(g_data.proj_view, world_pos);
-
-    return output;
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:c22ad9dc0b6ef1dc471df726e5829016400b6153612642511c442e759c5df6ba
+size 536

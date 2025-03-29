@@ -1,13 +1,3 @@
-#include "FullscreenVS.hlsl"
-
-Texture2D accum_t : register(t0);
-SamplerState linear_clamp_s : register(s0);
-
-float4 Main(FullscreenVertex input) : SV_TARGET
-{
-    float4 color = accum_t.Sample(linear_clamp_s, input.uv);
-
-    color = pow(color, 1 / 2.2);
-
-    return float4(color.xyz, 1.0);
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:960fce6c5a6b11b17fd1d6f7c52ca0540cab2c9ec594c0d0cf3af973a1912a12
+size 305
