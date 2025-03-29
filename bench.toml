@@ -1,0 +1,5 @@
+width = 1920
+height = 1080
+port = 7878
+scenes = ["./assets/scenes/Bistro/scene.gltf"]
+bench_frames = 500
