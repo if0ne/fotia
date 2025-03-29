@@ -2,8 +2,10 @@ mod settings;
 
 use serde::{Deserialize, Serialize};
 use settings::read_settings;
-use std::{borrow::Cow, collections::HashMap, time::Duration};
+use std::{borrow::Cow, collections::HashMap, process::Stdio, time::Duration};
 use tokio::{io::AsyncReadExt, net::TcpListener, process::Command};
+use tracing::{error, info};
+use tracing_subscriber::layer::SubscriberExt;
 
 #[derive(Debug, Serialize, Deserialize)]
 enum TimingsInfo {
@@ -99,7 +101,10 @@ impl SceneBenchmark {
     }
 
     fn calculate_result(self) -> SceneBenchmarkResult {
-        println!("\nBenchmark results for scene: {}", self.scene_name);
+        info!(
+            "Calculating benchmark results for scene: {}, cascade size: {}, cascade count: {}",
+            self.scene_name, self.cascades_size, self.cascades_count
+        );
 
         let single_cpu_avg =
             self.single_cpu.iter().sum::<Duration>() / self.single_cpu.len() as u32;
@@ -183,61 +188,69 @@ async fn benchmark_scene(
         .arg(cascades_count.to_string())
         .arg("--bench-frames")
         .arg(bench_frames.to_string())
+        .stdout(Stdio::null())
         .spawn()?;
 
-    let (mut stream, _) = listener.accept().await?;
+    tokio::select! {
+        _ = app.wait() => {
 
-    let mut json_data = Vec::new();
-    stream.read_to_end(&mut json_data).await?;
-
-    let messages: Vec<TimingsInfo> = serde_json::from_slice(&json_data)?;
-
-    for msg in messages {
-        match msg {
-            TimingsInfo::PrimarySingleGpu(t) => {
-                for (pass, duration) in &t.timings {
-                    bench_scene
-                        .single_passes
-                        .entry(pass.to_string())
-                        .or_default()
-                        .push(*duration);
-                }
-                bench_scene.single_gpu.push(t.total);
-            }
-            TimingsInfo::SingleCpuTotal(d) => bench_scene.single_cpu.push(d),
-            TimingsInfo::PrimaryMultiGpu(t) => {
-                for (pass, duration) in &t.timings {
-                    bench_scene
-                        .multi_primary_passes
-                        .entry(pass.to_string())
-                        .or_default()
-                        .push(*duration);
-                }
-                bench_scene.multi_primary_gpu.push(t.total);
-            }
-            TimingsInfo::SecondaryMultiGpu(t) => {
-                for (pass, duration) in &t.timings {
-                    bench_scene
-                        .multi_secondary_passes
-                        .entry(pass.to_string())
-                        .or_default()
-                        .push(*duration);
-                }
-                bench_scene.multi_secondary_gpu.push(t.total);
-            }
-            TimingsInfo::MultiCpuTotal(d) => bench_scene.multi_cpu.push(d),
-            TimingsInfo::GpuInfo { primary, secondary } => {
-                if bench_result.gpus.is_empty() {
-                    bench_result.gpus.push(primary);
-                    bench_result.gpus.push(secondary);
-                }
-            }
         }
-    }
+        result =  listener.accept() => {
+            let (mut stream, _) = result?;
 
-    bench_result.benchmarks.push(bench_scene.calculate_result());
+            let mut json_data = Vec::new();
+            stream.read_to_end(&mut json_data).await?;
 
-    app.kill().await?;
+            let messages: Vec<TimingsInfo> = serde_json::from_slice(&json_data)?;
+
+            for msg in messages {
+                match msg {
+                    TimingsInfo::PrimarySingleGpu(t) => {
+                        for (pass, duration) in &t.timings {
+                            bench_scene
+                                .single_passes
+                                .entry(pass.to_string())
+                                .or_default()
+                                .push(*duration);
+                        }
+                        bench_scene.single_gpu.push(t.total);
+                    }
+                    TimingsInfo::SingleCpuTotal(d) => bench_scene.single_cpu.push(d),
+                    TimingsInfo::PrimaryMultiGpu(t) => {
+                        for (pass, duration) in &t.timings {
+                            bench_scene
+                                .multi_primary_passes
+                                .entry(pass.to_string())
+                                .or_default()
+                                .push(*duration);
+                        }
+                        bench_scene.multi_primary_gpu.push(t.total);
+                    }
+                    TimingsInfo::SecondaryMultiGpu(t) => {
+                        for (pass, duration) in &t.timings {
+                            bench_scene
+                                .multi_secondary_passes
+                                .entry(pass.to_string())
+                                .or_default()
+                                .push(*duration);
+                        }
+                        bench_scene.multi_secondary_gpu.push(t.total);
+                    }
+                    TimingsInfo::MultiCpuTotal(d) => bench_scene.multi_cpu.push(d),
+                    TimingsInfo::GpuInfo { primary, secondary } => {
+                        if bench_result.gpus.is_empty() {
+                            bench_result.gpus.push(primary);
+                            bench_result.gpus.push(secondary);
+                        }
+                    }
+                }
+            }
+
+            bench_result.benchmarks.push(bench_scene.calculate_result());
+
+            app.kill().await?;
+        }
+    };
 
     Ok(())
 }
@@ -247,16 +260,24 @@ async fn main() -> anyhow::Result<()> {
     unsafe {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
+    let console_log = tracing_subscriber::fmt::Layer::new()
+        .with_ansi(true)
+        .with_writer(std::io::stdout);
+    let subscriber = tracing_subscriber::registry().with(console_log);
+    let _ = tracing::subscriber::set_global_default(subscriber);
 
-    let settings = read_settings();
+    let settings = read_settings().await;
     let mut bench_result = BenchmarkResult::default();
 
     let bench_addr = format!("127.0.0.1:{}", settings.port);
 
     for scene in settings.scenes {
-        println!("Starting benchmark for scene: {}", scene);
         for size in [1024, 2048, 4096] {
             for count in [3, 4] {
+                info!(
+                    "Starting benchmark for scene: {}, cascade size: {}, cascade count: {}",
+                    scene, size, count
+                );
                 if let Err(e) = benchmark_scene(
                     &scene,
                     &bench_addr,
@@ -269,13 +290,16 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .await
                 {
-                    eprintln!("Error benchmarking {}: {}", scene, e);
+                    error!("Error benchmarking {}: {}", scene, e);
                 }
             }
         }
     }
 
-    dbg!(bench_result);
+    let contents = serde_json::to_vec_pretty(&bench_result).expect("failed to serialize");
+    tokio::fs::write("result.json", &contents)
+        .await
+        .expect("faild to write result into file");
 
     Ok(())
 }
