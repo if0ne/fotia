@@ -529,7 +529,7 @@ impl<D: RenderDevice> winit::application::ApplicationHandler for Application<D> 
             SwapchainDesc {
                 width: self.width,
                 height: self.height,
-                present_mode: PresentMode::Immediate,
+                present_mode: PresentMode::Mailbox,
                 frames: self.frames_in_flight,
             },
             &wnd,

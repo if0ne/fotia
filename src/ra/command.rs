@@ -291,6 +291,10 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
         Self::RenderEncoder {
             raw,
             mapper: &self.mapper,
+            active_vbs: Default::default(),
+            active_ibs: Default::default(),
+            active_arguments: Default::default(),
+            active_dyn_offsets: Default::default(),
         }
     }
 
@@ -307,6 +311,10 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
 pub struct RenderEncoderImpl<'a, D: RenderDevice> {
     pub(super) raw: RenderEncoderType<'a, D>,
     pub(super) mapper: &'a ResourceMapper<D>,
+    active_vbs: [Option<Handle<Buffer>>; 16],
+    active_arguments: [Option<Handle<ShaderArgument>>; 4],
+    active_dyn_offsets: [usize; 4],
+    active_ibs: Option<Handle<Buffer>>,
 }
 
 pub trait RenderEncoder {
@@ -370,6 +378,15 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
         argument: Handle<ShaderArgument>,
         dynamic_offset: usize,
     ) {
+        if self.active_arguments[set as usize] == Some(argument)
+            && self.active_dyn_offsets[set as usize] == dynamic_offset
+        {
+            return;
+        } else {
+            self.active_arguments[set as usize] = Some(argument);
+            self.active_dyn_offsets[set as usize] = dynamic_offset;
+        }
+
         let guard = self.mapper.shader_arguments.lock();
         let argument = guard.get(argument).expect("failed to get shader argument");
 
@@ -377,6 +394,12 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
     }
 
     fn bind_vertex_buffer(&mut self, buffer: Handle<Buffer>, slot: usize) {
+        if self.active_vbs[slot] == Some(buffer) {
+            return;
+        } else {
+            self.active_vbs[slot] = Some(buffer);
+        }
+
         let guard = self.mapper.buffers.lock();
         let buffer = guard.get(buffer).expect("failed to get buffer");
 
@@ -384,6 +407,12 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
     }
 
     fn bind_index_buffer(&mut self, buffer: Handle<Buffer>, ty: IndexType) {
+        if self.active_ibs == Some(buffer) {
+            return;
+        } else {
+            self.active_ibs = Some(buffer);
+        }
+
         let guard = self.mapper.buffers.lock();
         let buffer = guard.get(buffer).expect("failed to get buffer");
 
