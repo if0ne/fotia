@@ -163,6 +163,7 @@ impl SceneBenchmark {
 async fn benchmark_scene(
     scene: &str,
     bench_addr: &str,
+    listener: &TcpListener,
     width: u32,
     height: u32,
     cascades_size: u32,
@@ -171,7 +172,6 @@ async fn benchmark_scene(
     bench_result: &mut BenchmarkResult,
 ) -> anyhow::Result<()> {
     let mut bench_scene = SceneBenchmark::new(scene, cascades_size, cascades_count);
-    let listener = TcpListener::bind(bench_addr).await?;
 
     let mut app = Command::new("fotia.exe")
         .arg("--scene-path")
@@ -188,7 +188,7 @@ async fn benchmark_scene(
         .arg(cascades_count.to_string())
         .arg("--bench-frames")
         .arg(bench_frames.to_string())
-        .stdout(Stdio::null())
+        .stdin(Stdio::null())
         .spawn()?;
 
     tokio::select! {
@@ -197,6 +197,7 @@ async fn benchmark_scene(
         }
         result =  listener.accept() => {
             let (mut stream, _) = result?;
+            app.wait().await?;
 
             let mut json_data = Vec::new();
             stream.read_to_end(&mut json_data).await?;
@@ -270,6 +271,7 @@ async fn main() -> anyhow::Result<()> {
     let mut bench_result = BenchmarkResult::default();
 
     let bench_addr = format!("127.0.0.1:{}", settings.port);
+    let listener = TcpListener::bind(&bench_addr).await?;
 
     for scene in settings.scenes {
         for size in [1024, 2048, 4096] {
@@ -281,6 +283,7 @@ async fn main() -> anyhow::Result<()> {
                 if let Err(e) = benchmark_scene(
                     &scene,
                     &bench_addr,
+                    &listener,
                     settings.width,
                     settings.height,
                     size,

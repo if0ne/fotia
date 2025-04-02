@@ -139,11 +139,15 @@ fn main() {
 
     let settings = read_settings();
 
+    let (start_sdr, start_rcv) = std::sync::mpsc::sync_channel(1);
+
     let (sdr, thread) = if let Some(addr) = &settings.bench_addr {
         let (sdr, rcv) = std::sync::mpsc::channel();
         let mut connection = std::net::TcpStream::connect(addr).expect("wrong TCP-address");
 
         let thread = std::thread::spawn(move || {
+            start_rcv.recv().expect("failed to recv");
+
             let mut timings = vec![];
             while let Ok(data) = rcv.recv_timeout(std::time::Duration::from_secs(30)) {
                 if data == TimingsInfo::End {
@@ -166,7 +170,10 @@ fn main() {
     };
 
     let mut app = Application::new(settings, sdr.clone());
+    start_sdr.send(()).expect("failed to send");
+
     event_loop.run_app(&mut app).expect("failed to run app");
+
     if let Some(sdr) = sdr {
         sdr.send(TimingsInfo::End).expect("failed to send message");
     }
