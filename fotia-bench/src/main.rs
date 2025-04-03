@@ -71,16 +71,16 @@ struct SceneBenchmarkResult {
     scene_name: String,
     cascades_size: u32,
     cascades_count: u32,
-    single_cpu_avg: Duration,
-    single_gpu_avg: Duration,
-    single_passes_avg: HashMap<String, Duration>,
+    single_cpu_avg: f32,
+    single_gpu_avg: f32,
+    single_passes_avg: HashMap<String, f32>,
 
-    multi_cpu_avg: Duration,
-    multi_primary_gpu_avg: Duration,
-    multi_secondary_gpu_avg: Duration,
+    multi_cpu_avg: f32,
+    multi_primary_gpu_avg: f32,
+    multi_secondary_gpu_avg: f32,
 
-    multi_primary_passes_avg: HashMap<String, Duration>,
-    multi_secondary_passes_avg: HashMap<String, Duration>,
+    multi_primary_passes_avg: HashMap<String, f32>,
+    multi_secondary_passes_avg: HashMap<String, f32>,
 }
 
 impl SceneBenchmark {
@@ -116,7 +116,7 @@ impl SceneBenchmark {
             .into_iter()
             .map(|(pass, times)| {
                 let avg_time = times.iter().sum::<Duration>() / times.len() as u32;
-                (pass, avg_time)
+                (pass, avg_time.as_secs_f32() * 1000.0)
             })
             .collect();
 
@@ -131,7 +131,7 @@ impl SceneBenchmark {
             .into_iter()
             .map(|(pass, times)| {
                 let avg_time = times.iter().sum::<Duration>() / times.len() as u32;
-                (pass, avg_time)
+                (pass, avg_time.as_secs_f32() * 1000.0)
             })
             .collect();
 
@@ -140,7 +140,7 @@ impl SceneBenchmark {
             .into_iter()
             .map(|(pass, times)| {
                 let avg_time = times.iter().sum::<Duration>() / times.len() as u32;
-                (pass, avg_time)
+                (pass, avg_time.as_secs_f32() * 1000.0)
             })
             .collect();
 
@@ -148,12 +148,12 @@ impl SceneBenchmark {
             scene_name: self.scene_name,
             cascades_size: self.cascades_size,
             cascades_count: self.cascades_count,
-            single_cpu_avg,
-            single_gpu_avg,
+            single_cpu_avg: single_cpu_avg.as_secs_f32() * 1000.0,
+            single_gpu_avg: single_gpu_avg.as_secs_f32() * 1000.0,
             single_passes_avg,
-            multi_cpu_avg,
-            multi_primary_gpu_avg,
-            multi_secondary_gpu_avg,
+            multi_cpu_avg: multi_cpu_avg.as_secs_f32() * 1000.0,
+            multi_primary_gpu_avg: multi_primary_gpu_avg.as_secs_f32() * 1000.0,
+            multi_secondary_gpu_avg: multi_secondary_gpu_avg.as_secs_f32() * 1000.0,
             multi_primary_passes_avg,
             multi_secondary_passes_avg,
         }
