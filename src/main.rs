@@ -56,6 +56,7 @@ pub enum TimingsInfo {
     },
     PrimarySingleGpu(Timings),
     PrimaryMultiGpu(Timings),
+    PrimaryCopyMultiGpu(Timings),
     SecondaryMultiGpu(Timings),
     SingleCpuTotal(std::time::Duration),
     MultiCpuTotal(std::time::Duration),

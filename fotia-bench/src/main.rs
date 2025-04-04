@@ -15,6 +15,7 @@ enum TimingsInfo {
     },
     PrimarySingleGpu(Timings),
     PrimaryMultiGpu(Timings),
+    PrimaryCopyMultiGpu(Timings),
     SecondaryMultiGpu(Timings),
     SingleCpuTotal(Duration),
     MultiCpuTotal(Duration),
@@ -60,6 +61,7 @@ struct SceneBenchmark {
 
     multi_cpu: Vec<Duration>,
     multi_primary_gpu: Vec<Duration>,
+    multi_primary_copy_gpu: Vec<Duration>,
     multi_secondary_gpu: Vec<Duration>,
 
     multi_primary_passes: HashMap<String, Vec<Duration>>,
@@ -77,6 +79,7 @@ struct SceneBenchmarkResult {
 
     multi_cpu_avg: f32,
     multi_primary_gpu_avg: f32,
+    multi_primary_copy_gpu_avg: f32,
     multi_secondary_gpu_avg: f32,
 
     multi_primary_passes_avg: HashMap<String, f32>,
@@ -94,6 +97,7 @@ impl SceneBenchmark {
             single_passes: HashMap::new(),
             multi_cpu: Vec::new(),
             multi_primary_gpu: Vec::new(),
+            multi_primary_copy_gpu: Vec::new(),
             multi_secondary_gpu: Vec::new(),
             multi_primary_passes: HashMap::new(),
             multi_secondary_passes: HashMap::new(),
@@ -123,6 +127,8 @@ impl SceneBenchmark {
         let multi_cpu_avg = self.multi_cpu.iter().sum::<Duration>() / self.multi_cpu.len() as u32;
         let multi_primary_gpu_avg =
             self.multi_primary_gpu.iter().sum::<Duration>() / self.multi_primary_gpu.len() as u32;
+        let multi_primary_copy_gpu_avg = self.multi_primary_copy_gpu.iter().sum::<Duration>()
+            / self.multi_primary_copy_gpu.len() as u32;
         let multi_secondary_gpu_avg = self.multi_secondary_gpu.iter().sum::<Duration>()
             / self.multi_secondary_gpu.len() as u32;
 
@@ -153,6 +159,7 @@ impl SceneBenchmark {
             single_passes_avg,
             multi_cpu_avg: multi_cpu_avg.as_secs_f32() * 1000.0,
             multi_primary_gpu_avg: multi_primary_gpu_avg.as_secs_f32() * 1000.0,
+            multi_primary_copy_gpu_avg: multi_primary_copy_gpu_avg.as_secs_f32() * 1000.0,
             multi_secondary_gpu_avg: multi_secondary_gpu_avg.as_secs_f32() * 1000.0,
             multi_primary_passes_avg,
             multi_secondary_passes_avg,
@@ -226,6 +233,9 @@ async fn benchmark_scene(
                                 .push(*duration);
                         }
                         bench_scene.multi_primary_gpu.push(t.total);
+                    }
+                    TimingsInfo::PrimaryCopyMultiGpu(t) => {
+                        bench_scene.multi_primary_copy_gpu.push(t.total);
                     }
                     TimingsInfo::SecondaryMultiGpu(t) => {
                         for (pass, duration) in &t.timings {
