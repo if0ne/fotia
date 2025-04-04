@@ -162,10 +162,9 @@ impl<D: RenderDevice> MultiGpuShadows<D> {
                     let mut cmd = ctx.create_encoder(CommandType::Transfer);
                     let timings = cmd.begin(ctx);
 
-                    if let Some(sdr) = &mut self.sender {
-                        if let Some(timings) = timings {
-                            sdr.send(TimingsInfo::PrimaryMultiGpu(timings))
-                                .expect("failed to send");
+                    if let Some(_sdr) = &mut self.sender {
+                        if let Some(_timings) = timings {
+                            // TODO: Send copy timings
                         }
                     } else {
                         info!("Copy Timings: {:?}", timings);
