@@ -36,13 +36,13 @@ impl<D: RenderDevice> RenderShaderContext for Context<D> {
     fn bind_pipeline_layout(&self, handle: Handle<PipelineLayout>, desc: PipelineLayoutDesc<'_>) {
         let layout = self.gpu.create_pipeline_layout(desc);
 
-        if let Some(layout) = self.mapper.pipeline_layouts.lock().set(handle, layout) {
+        if let Some(layout) = self.mapper.pipeline_layouts.write().set(handle, layout) {
             self.gpu.destroy_pipeline_layout(layout);
         }
     }
 
     fn unbind_pipeline_layout(&self, handle: Handle<PipelineLayout>) {
-        let Some(layout) = self.mapper.pipeline_layouts.lock().remove(handle) else {
+        let Some(layout) = self.mapper.pipeline_layouts.write().remove(handle) else {
             return;
         };
 
@@ -50,9 +50,9 @@ impl<D: RenderDevice> RenderShaderContext for Context<D> {
     }
 
     fn bind_shader_argument(&self, handle: Handle<ShaderArgument>, desc: ShaderArgumentDesc<'_>) {
-        let buffers = self.mapper.buffers.lock();
-        let textures = self.mapper.textures.lock();
-        let samplers = self.mapper.samplers.lock();
+        let buffers = self.mapper.buffers.write();
+        let textures = self.mapper.textures.write();
+        let samplers = self.mapper.samplers.write();
 
         let views = desc.views.iter().map(|e| match e {
             ShaderEntry::Cbv(handle, size) => rhi::shader::ShaderEntry::Cbv(
@@ -84,13 +84,13 @@ impl<D: RenderDevice> RenderShaderContext for Context<D> {
 
         let argument = self.gpu.create_shader_argument(desc);
 
-        if let Some(argument) = self.mapper.shader_arguments.lock().set(handle, argument) {
+        if let Some(argument) = self.mapper.shader_arguments.write().set(handle, argument) {
             self.gpu.destroy_shader_argument(argument);
         }
     }
 
     fn unbind_shader_argument(&self, handle: Handle<ShaderArgument>) {
-        let Some(argument) = self.mapper.shader_arguments.lock().remove(handle) else {
+        let Some(argument) = self.mapper.shader_arguments.write().remove(handle) else {
             return;
         };
 
@@ -98,7 +98,7 @@ impl<D: RenderDevice> RenderShaderContext for Context<D> {
     }
 
     fn bind_raster_pipeline(&self, handle: Handle<RasterPipeline>, desc: RasterPipelineDesc<'_>) {
-        let guard = self.mapper.pipeline_layouts.lock();
+        let guard = self.mapper.pipeline_layouts.write();
         let layout = desc
             .layout
             .map(|h| guard.get(h).expect("failed to get pipeline layout"));
@@ -118,13 +118,13 @@ impl<D: RenderDevice> RenderShaderContext for Context<D> {
 
         let pipeline = self.gpu.create_raster_pipeline(desc);
 
-        if let Some(pipeline) = self.mapper.raster_pipelines.lock().set(handle, pipeline) {
+        if let Some(pipeline) = self.mapper.raster_pipelines.write().set(handle, pipeline) {
             self.gpu.destroy_raster_pipeline(pipeline);
         }
     }
 
     fn unbind_raster_pipeline(&self, handle: Handle<RasterPipeline>) {
-        let Some(pipeline) = self.mapper.raster_pipelines.lock().remove(handle) else {
+        let Some(pipeline) = self.mapper.raster_pipelines.write().remove(handle) else {
             return;
         };
 

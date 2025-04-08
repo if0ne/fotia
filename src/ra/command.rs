@@ -256,8 +256,8 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
     }
 
     fn set_barriers(&mut self, barriers: &[Barrier]) {
-        let buffers = self.mapper.buffers.lock();
-        let textures = self.mapper.textures.lock();
+        let buffers = self.mapper.buffers.read();
+        let textures = self.mapper.textures.read();
 
         let barriers = barriers.iter().map(|b| match b {
             Barrier::Buffer(handle, resource_state) => rhi::command::Barrier::Buffer(
@@ -280,7 +280,7 @@ impl<D: RenderDevice> RenderCommandEncoder<D> for CommandEncoder<D> {
         targets: &[Handle<Texture>],
         depth: Option<Handle<Texture>>,
     ) -> Self::RenderEncoder<'_> {
-        let guard = self.mapper.textures.lock();
+        let guard = self.mapper.textures.read();
         let targets = targets
             .iter()
             .map(|h| guard.get(*h).expect("failed to get texture"));
@@ -342,13 +342,13 @@ pub trait RenderEncoder {
 
 impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
     fn clear_rt(&mut self, texture: Handle<Texture>, color: Option<[f32; 4]>) {
-        let guard = self.mapper.textures.lock();
+        let guard = self.mapper.textures.read();
         self.raw
             .clear_rt(guard.get(texture).expect("failed to get texture"), color);
     }
 
     fn clear_depth(&mut self, texture: Handle<Texture>, depth: Option<f32>) {
-        let guard = self.mapper.textures.lock();
+        let guard = self.mapper.textures.read();
         self.raw
             .clear_depth(guard.get(texture).expect("failed to get texture"), depth);
     }
@@ -366,7 +366,7 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
     }
 
     fn set_render_pipeline(&mut self, pipeline: Handle<RasterPipeline>) {
-        let guard = self.mapper.raster_pipelines.lock();
+        let guard = self.mapper.raster_pipelines.read();
         let pipeline = guard.get(pipeline).expect("failed to get pipeline");
 
         self.raw.set_raster_pipeline(pipeline);
@@ -387,7 +387,7 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
             self.active_dyn_offsets[set as usize] = dynamic_offset;
         }
 
-        let guard = self.mapper.shader_arguments.lock();
+        let guard = self.mapper.shader_arguments.read();
         let argument = guard.get(argument).expect("failed to get shader argument");
 
         self.raw.bind_shader_argument(set, argument, dynamic_offset);
@@ -400,7 +400,7 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
             self.active_vbs[slot] = Some(buffer);
         }
 
-        let guard = self.mapper.buffers.lock();
+        let guard = self.mapper.buffers.read();
         let buffer = guard.get(buffer).expect("failed to get buffer");
 
         self.raw.bind_vertex_buffer(buffer, slot);
@@ -413,7 +413,7 @@ impl<'a, D: RenderDevice> RenderEncoder for RenderEncoderImpl<'a, D> {
             self.active_ibs = Some(buffer);
         }
 
-        let guard = self.mapper.buffers.lock();
+        let guard = self.mapper.buffers.read();
         let buffer = guard.get(buffer).expect("failed to get buffer");
 
         self.raw.bind_index_buffer(buffer, ty);
@@ -440,14 +440,14 @@ pub trait TransferEncoder {
 
 impl<'a, D: RenderDevice> TransferEncoder for TransferEncoderImpl<'a, D> {
     fn pull_texture(&self, texture: Handle<Texture>) {
-        let guard = self.mapper.textures.lock();
+        let guard = self.mapper.textures.read();
 
         self.raw
             .pull_texture(guard.get(texture).expect("failed to get texture"));
     }
 
     fn push_texture(&self, texture: Handle<Texture>) {
-        let guard = self.mapper.textures.lock();
+        let guard = self.mapper.textures.read();
 
         self.raw
             .push_texture(guard.get(texture).expect("failed to get texture"));

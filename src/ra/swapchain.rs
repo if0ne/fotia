@@ -57,7 +57,7 @@ impl<D: RenderDevice> RenderSwapchainContext for Context<D> {
             .into_iter()
             .zip(handles)
             .map(|(frame, handle)| {
-                self.mapper.textures.lock().set(handle, frame.texture);
+                self.mapper.textures.write().set(handle, frame.texture);
 
                 SwapchainFrame {
                     texture: handle,
@@ -76,7 +76,7 @@ impl<D: RenderDevice> RenderSwapchainContext for Context<D> {
         handle_allocator: &HandleContainer,
     ) {
         for frame in swapchain.frames.drain(..) {
-            if let Some(texture) = self.mapper.textures.lock().remove(frame.texture) {
+            if let Some(texture) = self.mapper.textures.write().remove(frame.texture) {
                 self.gpu.destroy_swapchain_image(texture);
             };
 
@@ -93,7 +93,7 @@ impl<D: RenderDevice> RenderSwapchainContext for Context<D> {
             .into_iter()
             .zip(handles)
             .map(|(frame, handle)| {
-                self.mapper.textures.lock().set(handle, frame.texture);
+                self.mapper.textures.write().set(handle, frame.texture);
 
                 SwapchainFrame {
                     texture: handle,
