@@ -37,24 +37,25 @@ pub(super) fn map_texture_desc(
     is_cross_adapter_texture_supported: bool,
 ) -> dx::ResourceDesc {
     let raw_desc = match desc.ty {
-        TextureType::D1 => dx::ResourceDesc::texture_1d(desc.extent[0]).with_array_size(1),
-        TextureType::D1Array => {
-            dx::ResourceDesc::texture_1d(desc.extent[0]).with_array_size(desc.extent[2] as u16)
-        }
-        TextureType::D2 => {
-            dx::ResourceDesc::texture_2d(desc.extent[0], desc.extent[1]).with_array_size(1)
-        }
-        TextureType::D2Array => dx::ResourceDesc::texture_2d(desc.extent[0], desc.extent[1])
+        TextureType::D1 => dx::ResourceDesc::texture_1d(desc.extent[0] as u64).with_array_size(1),
+        TextureType::D1Array => dx::ResourceDesc::texture_1d(desc.extent[0] as u64)
             .with_array_size(desc.extent[2] as u16),
-        TextureType::D3 => {
-            dx::ResourceDesc::texture_3d(desc.extent[0], desc.extent[1], desc.extent[2] as u16)
+        TextureType::D2 => {
+            dx::ResourceDesc::texture_2d(desc.extent[0] as u64, desc.extent[1]).with_array_size(1)
         }
+        TextureType::D2Array => dx::ResourceDesc::texture_2d(desc.extent[0] as u64, desc.extent[1])
+            .with_array_size(desc.extent[2] as u16),
+        TextureType::D3 => dx::ResourceDesc::texture_3d(
+            desc.extent[0] as u64,
+            desc.extent[1],
+            desc.extent[2] as u16,
+        ),
     };
 
     raw_desc
         .with_alignment(dx::HeapAlignment::ResourcePlacement)
         .with_format(map_format(desc.format))
-        .with_mip_levels(desc.mip_levels as u32)
+        .with_mip_levels(desc.mip_levels)
         .with_layout(dx::TextureLayout::Unknown)
         .with_flags(map_texture_flags(
             desc.usage,

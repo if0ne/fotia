@@ -41,7 +41,7 @@ impl RenderSwapchainDevice for DxDevice {
         let raw_desc = dx::SwapchainDesc1::new(desc.width, desc.height)
             .with_format(dx::Format::Rgba8Unorm)
             .with_usage(dx::FrameBufferUsage::RenderTargetOutput)
-            .with_buffer_count(desc.frames)
+            .with_buffer_count(desc.frames as u32)
             .with_scaling(dx::Scaling::None)
             .with_swap_effect(dx::SwapEffect::FlipDiscard)
             .with_flags(dx::SwapchainFlags::AllowTearing);
@@ -83,7 +83,7 @@ impl RenderSwapchainDevice for DxDevice {
         swapchain
             .raw
             .resize_buffers(
-                swapchain.desc.frames,
+                swapchain.desc.frames as u32,
                 extent[0],
                 extent[1],
                 dx::Format::Unknown,
@@ -94,7 +94,7 @@ impl RenderSwapchainDevice for DxDevice {
         for i in 0..swapchain.desc.frames {
             let res: dx::Resource = swapchain
                 .raw
-                .get_buffer(i)
+                .get_buffer(i as u32)
                 .expect("Failed to get swapchain buffer");
 
             let descriptor = self.descriptors.rtv_heap.lock().allocate(1);

@@ -30,7 +30,8 @@ impl RenderResourceDevice for DxDevice {
             MemoryLocation::GpuToCpu => dx::HeapProperties::readback(),
         };
 
-        let raw_desc = dx::ResourceDesc::buffer(desc.size).with_layout(dx::TextureLayout::RowMajor);
+        let raw_desc =
+            dx::ResourceDesc::buffer(desc.size as u64).with_layout(dx::TextureLayout::RowMajor);
 
         let initial_state = if desc.usage.contains(BufferUsages::Uniform)
             | desc.usage.contains(BufferUsages::Copy)
@@ -195,11 +196,11 @@ impl RenderResourceDevice for DxDevice {
         let raw = match ty {
             CommandType::Graphics | CommandType::Compute => self
                 .gpu
-                .create_query_heap(&dx::QueryHeapDesc::timestamp(2 * size))
+                .create_query_heap(&dx::QueryHeapDesc::timestamp(2 * size as u32))
                 .expect("failed to create timestamp query"),
             CommandType::Transfer => self
                 .gpu
-                .create_query_heap(&dx::QueryHeapDesc::copy_queue_timestamp(2 * size))
+                .create_query_heap(&dx::QueryHeapDesc::copy_queue_timestamp(2 * size as u32))
                 .expect("failed to create timestamp query"),
         };
 
@@ -290,7 +291,7 @@ impl DxDevice {
             None,
             None,
             None,
-        );
+        ) as usize;
 
         let state = if desc.usage.contains(TextureUsages::RenderTarget) {
             dx::ResourceStates::RenderTarget
@@ -366,7 +367,8 @@ impl DxDevice {
 
             let size = self
                 .gpu
-                .get_copyable_footprints(&raw_desc, 0..1, 0, None, None, None);
+                .get_copyable_footprints(&raw_desc, 0..1, 0, None, None, None)
+                as usize;
 
             let clear_color = desc.clear_color.map(|c| map_clear_color(desc.format, c));
             let cross_res = self
@@ -449,7 +451,8 @@ impl DxDevice {
 
             let size = self
                 .gpu
-                .get_copyable_footprints(&raw_desc, 0..1, 0, None, None, None);
+                .get_copyable_footprints(&raw_desc, 0..1, 0, None, None, None)
+                as usize;
 
             let cross_res = self
                 .gpu

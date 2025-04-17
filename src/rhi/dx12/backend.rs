@@ -151,7 +151,7 @@ impl DxBackend {
                         adapter,
                         RenderDeviceInfo {
                             name: desc.description().trim_matches('\0').to_string(),
-                            id: i,
+                            id: i as usize,
                             is_cross_adapter_texture_supported: feature
                                 .cross_adapter_row_major_texture_supported(),
                             is_uma: hardware.uma(),

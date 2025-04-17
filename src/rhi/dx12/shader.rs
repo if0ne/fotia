@@ -155,7 +155,7 @@ impl RenderShaderDevice for DxDevice {
                     ShaderEntry::Cbv(buffer, buffer_size) => self.gpu.create_constant_buffer_view(
                         Some(&dx::ConstantBufferViewDesc::new(
                             buffer.raw.get_gpu_virtual_address(),
-                            buffer_size,
+                            buffer_size as u32,
                         )),
                         views.cpu.advance(i, size),
                     ),

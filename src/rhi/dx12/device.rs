@@ -111,10 +111,10 @@ impl DescriptorHeap {
                 (false, dx::DescriptorHeapFlags::empty())
             };
 
-        let inc_size = device.get_descriptor_handle_increment_size(ty);
+        let inc_size = device.get_descriptor_handle_increment_size(ty) as usize;
 
         let heap = device
-            .create_descriptor_heap(&dx::DescriptorHeapDesc::new(ty, size).with_flags(flags))
+            .create_descriptor_heap(&dx::DescriptorHeapDesc::new(ty, size as u32).with_flags(flags))
             .expect("Failed to create descriptor heap");
 
         let allocator = range_alloc::RangeAllocator::new(0..size);

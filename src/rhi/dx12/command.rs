@@ -324,7 +324,7 @@ impl DxCommandBuffer {
         self.list.end_query(
             &self.allocator.query.raw,
             dx::QueryType::Timestamp,
-            self.allocator.query.cur_index,
+            self.allocator.query.cur_index as u32,
         );
         self.allocator.query.cur_index += 1;
     }
@@ -478,7 +478,7 @@ impl RenderCommandBuffer for DxCommandBuffer {
             self.list.resolve_query_data(
                 &self.allocator.query.raw,
                 dx::QueryType::Timestamp,
-                range.clone(),
+                0..self.allocator.query.cur_index as u32,
                 &self.allocator.query.buffer.raw,
                 0,
             );
@@ -668,7 +668,7 @@ impl IoCommandBuffer for DxIoCommandBuffer {
             0,
             0..1,
             &[dx::SubresourceData::new(data).with_row_pitch(
-                texture.desc.format.bytes_per_pixel() * texture.desc.extent[0] as usize,
+                (texture.desc.format.bytes_per_pixel() * texture.desc.extent[0] as usize) as isize,
             )],
         );
 
@@ -773,7 +773,7 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
                 dx::ClearFlags::Depth,
                 depth,
                 0,
-                &[],
+                None,
             );
         }
     }
@@ -844,8 +844,8 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
             slot as u32,
             &[dx::VertexBufferView::new(
                 buffer.raw.get_gpu_virtual_address(),
-                buffer.desc.stride,
-                buffer.desc.size,
+                buffer.desc.stride as u32,
+                buffer.desc.size as u32,
             )],
         );
     }
@@ -855,7 +855,7 @@ impl<'a> RenderEncoder for DxRenderEncoder<'a> {
             .list
             .ia_set_index_buffer(Some(&dx::IndexBufferView::new(
                 buffer.raw.get_gpu_virtual_address(),
-                buffer.desc.size,
+                buffer.desc.size as u32,
                 match ty {
                     IndexType::U16 => dx::Format::R16Uint,
                     IndexType::U32 => dx::Format::R32Uint,
