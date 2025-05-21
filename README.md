@@ -35,4 +35,4 @@ Inspired by:
 
 Due to the asynchronous nature of the algorithm and large performance differences between GPUs, there may be artifacts when the camera rotates quickly.
 
-![Glitch](./assets/Glitch.jpg)
+![Glitch](./assets/glitch.gif)
