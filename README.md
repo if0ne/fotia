@@ -14,9 +14,9 @@ The first prototype can be found here [Multi-Gpu Shadows](https://github.com/if0
 
 # Controls
 
-- **W / A / S / D** — movement  
-- **Mouse** — rotate camera  
-- **1** — enable *Single GPU Shadows Rendering* mode  
+- **W / A / S / D** — movement
+- **Mouse** — rotate camera
+- **1** — enable *Single GPU Shadows Rendering* mode
 - **2** — enable *Multi-GPU Shadows Rendering* mode
 
 # References
@@ -30,3 +30,9 @@ Inspired by:
 # Demo
 
 ![Pica pica](./assets/demo.jpg)
+
+# Glitch
+
+Due to the asynchronous nature of the algorithm and large performance differences between GPUs, there may be artifacts when the camera rotates quickly.
+
+![Glitch](./assets/Glitch.jpg)
