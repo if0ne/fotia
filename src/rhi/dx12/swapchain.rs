@@ -43,7 +43,7 @@ impl RenderSwapchainDevice for DxDevice {
             .with_usage(dx::FrameBufferUsage::RenderTargetOutput)
             .with_buffer_count(desc.frames as u32)
             .with_scaling(dx::Scaling::None)
-            .with_swap_effect(dx::SwapEffect::FlipDiscard)
+            .with_swap_effect(dx::SwapEffect::FlipSequential)
             .with_flags(dx::SwapchainFlags::AllowTearing);
 
         let RawWindowHandle::Win32(hwnd) = wnd else {
