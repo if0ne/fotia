@@ -6,10 +6,7 @@ use std::{
     time::Duration,
 };
 
-use oxidx::dx::{
-    self, ICommandAllocator, ICommandQueue, IDevice, IFence, IGraphicsCommandList,
-    IGraphicsCommandListExt, IResource, PSO_NONE,
-};
+use oxidx::dx;
 use parking_lot::Mutex;
 use smallvec::SmallVec;
 
@@ -66,12 +63,7 @@ impl RenderCommandDevice for DxDevice {
 
         let cmd_list = self
             .gpu
-            .create_command_list(
-                0,
-                map_command_buffer_type(ty),
-                &cmd_allocators[0].raw,
-                PSO_NONE,
-            )
+            .create_command_list(0, map_command_buffer_type(ty), &cmd_allocators[0].raw, None)
             .expect("failed to create command list");
         cmd_list.close().expect("failed to close list");
 
@@ -215,13 +207,13 @@ impl RenderCommandQueue for DxCommandQueue {
         };
 
         let list = if let Some(list) = self.cmd_lists.lock().pop() {
-            list.reset(&allocator.raw, PSO_NONE)
+            list.reset(&allocator.raw, None)
                 .expect("Failed to reset list");
             list
         } else {
             let list = device
                 .gpu
-                .create_command_list(0, self.ty_raw, &allocator.raw, PSO_NONE)
+                .create_command_list(0, self.ty_raw, &allocator.raw, None)
                 .expect("failed to create command list");
             list.close().expect("failed to close list");
             list
@@ -662,7 +654,7 @@ impl IoCommandBuffer for DxIoCommandBuffer {
             .into_iter(),
         );
 
-        let copied = self.buffer.list.update_subresources_fixed::<1, _, _>(
+        let copied = self.buffer.list.update_subresources_fixed::<1, _>(
             &texture.raw,
             &staging.raw,
             0,

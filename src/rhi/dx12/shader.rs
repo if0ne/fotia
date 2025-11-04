@@ -1,4 +1,4 @@
-use oxidx::dx::{self, IBlobExt, IDevice, IResource};
+use oxidx::dx;
 use smallvec::SmallVec;
 
 use crate::rhi::{

@@ -1,6 +1,6 @@
 use std::{num::NonZero, sync::Arc};
 
-use oxidx::dx::{self, IDevice, IFactory4, ISwapchain1, ISwapchain3};
+use oxidx::dx;
 use parking_lot::Mutex;
 use smallvec::SmallVec;
 use winit::raw_window_handle::RawWindowHandle;

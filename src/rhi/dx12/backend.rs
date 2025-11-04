@@ -1,7 +1,7 @@
 use std::{ffi::CString, path::Path};
 
 use oxidx::dx::{
-    self, IAdapter3, IBlob, IBlobExt, IDebug, IDebug1, IDebugExt, IDevice, IFactory4, IFactory6,
+    self,
     features::{Architecture1Feature, Options3Feature, OptionsFeature},
 };
 use smallvec::SmallVec;

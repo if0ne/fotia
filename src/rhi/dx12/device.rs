@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use oxidx::dx::{self, IDescriptorHeap, IDevice};
+use oxidx::dx;
 use parking_lot::Mutex;
 use tracing::info;
 

@@ -1,6 +1,6 @@
 use std::{ffi::CString, sync::Arc};
 
-use oxidx::dx::{self, IDevice, IDeviceChildExt, IResource};
+use oxidx::dx;
 use parking_lot::Mutex;
 
 use crate::rhi::{
