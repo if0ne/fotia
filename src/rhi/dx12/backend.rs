@@ -1,7 +1,7 @@
 use std::{ffi::CString, path::Path};
 
 use oxidx::dx::{
-    self,
+    self, Blobby,
     features::{Architecture1Feature, Options3Feature, OptionsFeature},
 };
 use smallvec::SmallVec;
@@ -244,11 +244,11 @@ impl Api for DxBackend {
         let raw = dx::Blob::compile_from_file(&desc.path, &defines, &entry_point, target, flags, 0)
             .expect("Failed to compile a shader");
 
-        let mapped = raw.get_buffer_ptr::<u8>();
+        let mapped = raw.as_ptr();
 
-        let slice = unsafe { std::slice::from_raw_parts(mapped.as_ptr(), raw.get_buffer_size()) };
+        let slice = unsafe { std::slice::from_raw_parts(mapped, raw.len()) };
 
-        let mut raw = vec![0; raw.get_buffer_size()];
+        let mut raw = vec![0; raw.len()];
         raw.clone_from_slice(slice);
 
         CompiledShader { raw, ty: desc.ty }

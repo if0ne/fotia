@@ -235,7 +235,7 @@ impl RenderShaderDevice for DxDevice {
             raster
         };
 
-        let vs = dx::Blob::from_bytes(&desc.vs.raw).expect("failed to create blob");
+        let vs = dx::Blob::from(desc.vs.raw.clone());
 
         let raw_desc = dx::GraphicsPipelineDesc::new(&vs)
             .with_input_layout(&input_element_desc)
@@ -268,12 +268,7 @@ impl RenderShaderDevice for DxDevice {
         let shaders = desc
             .shaders
             .iter()
-            .map(|s| {
-                (
-                    dx::Blob::from_bytes(&s.raw).expect("failed to create blob"),
-                    s.ty,
-                )
-            })
+            .map(|s| (dx::Blob::from(s.raw.clone()), s.ty))
             .collect::<SmallVec<[_; 4]>>();
 
         for (shader, ty) in shaders.iter() {

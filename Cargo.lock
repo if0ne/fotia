@@ -1480,8 +1480,9 @@ dependencies = [
 
 [[package]]
 name = "oxidx"
-version = "0.9.0"
-source = "git+https://github.com/if0ne/oxidx?rev=a32b57947d7e6626b9c032dbe44fbb58235523f0#a32b57947d7e6626b9c032dbe44fbb58235523f0"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc09b0e6ae8e8e39966ac275217cc26e822010cf60ed58f4a9d85372cb08e7ec"
 dependencies = [
  "bitflags 2.10.0",
  "bytes",
